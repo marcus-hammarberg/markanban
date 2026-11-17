@@ -3,11 +3,19 @@
   "version": "0.1.0",
   "description": "A kanban board driven by a folder of markdown files",
   "type": "module",
-  "bin": { "markanban": "dist/cli.js" },
-  "files": ["dist", "public"],
-  "engines": { "node": ">=22.18" },
+  "bin": {
+    "markanban": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "public"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "build": "tsc",
+    "prepare": "tsc",
     "test": "node --test \"src/**/*.test.ts\"",
     "start": "node src/cli.ts"
   },
