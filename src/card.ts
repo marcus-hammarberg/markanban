@@ -220,9 +220,9 @@ export function slug(heading: string): string {
   return s || 'card';
 }
 
-export function newCard(heading: string, status: string | null, now: string): string {
+export function newCard(heading: string, status: string | null, who: string, now: string): string {
   const doc = parseDocument('');
   if (status) doc.set('status', status);
   doc.set('created', now);
-  return `---\n${String(doc)}---\n# ${heading.trim()}\n`;
+  return `---\n${String(doc)}---\n# ${heading.trim()}\n\n## Changelog\n- ${now} ${who} card: created\n`;
 }

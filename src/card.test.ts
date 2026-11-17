@@ -165,12 +165,17 @@ test('body edit keeps existing comments', () => {
   assert.equal(c.comments[0].text, 'keep me');
 });
 
-test('newCard writes status, created and H1; slug is filename-safe', () => {
-  const raw = newCard('Fix: Åsa’s login!', 'todo', NOW);
+test('newCard writes status, created, H1 and a "card: created" changelog line; slug is filename-safe', () => {
+  const raw = newCard('Fix: Åsa’s login!', 'todo', 'anna', NOW);
+  assert.equal(raw, `---\nstatus: todo\ncreated: ${NOW}\n---\n# Fix: Åsa’s login!\n\n## Changelog\n- ${NOW} anna card: created\n`);
   const c = parseCard(raw, meta);
   assert.equal(c.heading, 'Fix: Åsa’s login!');
   assert.equal(c.status, 'todo');
   assert.equal(c.created, NOW);
+  assert.equal(c.body, '# Fix: Åsa’s login!\n\n');
+  assert.deepEqual(c.history, [`${NOW} anna card: created`]);
+  // Later changes append below the created line.
+  assert.match(applyChange(raw, { fields: { status: 'doing' } }, 'm', 'T2'), /card: created\n- T2 m status: todo → doing\n$/);
   assert.equal(slug('Fix: Åsa’s login!'), 'fix-asa-s-login');
   assert.equal(slug('!!!'), 'card');
 });

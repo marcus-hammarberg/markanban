@@ -61,7 +61,7 @@ Users get logged out after 5 minutes.
 
 - Filename = slug of the heading (`Fix login bug` → `fix-login-bug.md`), `-2`, `-3`… on collision.
 - Filename never changes afterwards, even if the heading does.
-- Heading is written as a `# H1` in the body (not front-matter). `created` is set.
+- Heading is written as a `# H1` in the body (not front-matter). `created` is set, and the changelog starts with `card: created`.
 
 ## Changelog
 
@@ -73,6 +73,7 @@ The last section of the file, `## Changelog`, is a list. Newest last, append-onl
 
 - `(none)` = empty value.
 - Body edits log a single line: `<ts> <who> body: edited` (no diff).
+- Creating a card in the UI logs `<ts> <who> card: created` as the first line.
 - Only changes made through the UI are logged. External edits are accepted silently.
 - The section is hidden from the card body and shown in a "History" view instead.
 

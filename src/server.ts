@@ -10,6 +10,8 @@ import type { Storage } from './storage.ts';
 const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
 const TYPES: Record<string, string> = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml' };
 const MAX_BODY = 1_000_000;
+// ISO 8601 UTC, whole seconds: the timestamp format used in every card file.
+const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
 class HttpError extends Error {
   status: number;
@@ -60,7 +62,7 @@ export function createServer(storage: Storage, user: string) {
     for (let i = 1; i < 1000; i++) {
       const name = `${base}${i > 1 ? `-${i}` : ''}.md`;
       try {
-        await storage.write(name, newCard(heading, status, new Date().toISOString()), { create: true });
+        await storage.write(name, newCard(heading, status, user, now()), { create: true });
         return { name };
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
@@ -86,7 +88,7 @@ export function createServer(storage: Storage, user: string) {
     if (raw === null) throw new HttpError(404, `No card ${name}`);
     let next: string;
     try {
-      next = applyChange(raw, change, user, new Date().toISOString().replace(/\.\d+Z$/, 'Z'));
+      next = applyChange(raw, change, user, now());
     } catch (e) {
       throw new HttpError(400, (e as Error).message);
     }
