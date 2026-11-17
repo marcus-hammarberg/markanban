@@ -37,6 +37,8 @@
 }
 
 * { box-sizing: border-box; }
+/* `hidden` must always win, even over components that set their own display (e.g. .warnings). */
+[hidden] { display: none !important; }
 body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; }
 button, input, textarea { font: inherit; color: inherit; }
 

@@ -22,6 +22,8 @@
     <label class="toggle"><input type="checkbox" id="show-archived"> Show archived</label>
     <button id="theme" title="Theme"></button>
   </header>
+  <div id="error" class="error" hidden></div>
+  <div id="warnings" class="warnings" hidden></div>
   <div class="filters" id="filters">
     <input type="search" id="filter-q" placeholder="Search…" aria-label="Search heading and body">
     <select id="filter-type" aria-label="Filter by type"></select>
@@ -29,8 +31,6 @@
     <select id="filter-tag" aria-label="Filter by tag"></select>
     <button id="filter-clear" hidden>Clear</button>
   </div>
-  <div id="error" class="error" hidden></div>
-  <div id="warnings" class="warnings" hidden></div>
   <main id="board" class="board"></main>
 
   <dialog id="card-dialog">
