@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
-import { statSync } from 'node:fs';
+import { mkdirSync, statSync } from 'node:fs';
 import os from 'node:os';
 import { parseArgs } from 'node:util';
 import { createStorage } from './storage.ts';
@@ -19,13 +19,23 @@ const { values, positionals } = parseArgs({
 if (values.help) {
   console.log(`Usage: markanban [folder] [--port 4242] [--user name] [--no-open]
 
-  folder      Folder of markdown cards (default: current folder)
+  folder      Folder of markdown cards, created if missing (default: current folder)
   --user      Name written in changelogs (default: $MARKANBAN_USER, then OS user)`);
   process.exit(0);
 }
 
 const folder = positionals[0] ?? '.';
-if (!statSync(folder, { throwIfNoEntry: false })?.isDirectory()) {
+const existing = statSync(folder, { throwIfNoEntry: false });
+if (!existing) {
+  // Zero setup: a new board is just a new folder. Say so, so a typo doesn't go unnoticed.
+  try {
+    mkdirSync(folder, { recursive: true });
+    console.log(`Created new board folder: ${folder}`);
+  } catch (e) {
+    console.error(`Could not create folder ${folder}: ${(e as Error).message}`);
+    process.exit(1);
+  }
+} else if (!existing.isDirectory()) {
   console.error(`Not a folder: ${folder}`);
   process.exit(1);
 }

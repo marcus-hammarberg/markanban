@@ -12,7 +12,7 @@ You need [Node.js](https://nodejs.org) 22.18 or newer.
 npx github:marcus-hammarberg/markanban ./my-board
 ```
 
-This opens the board in your browser at <http://localhost:4242>. Leave out the folder to use the current one. The first run takes a little longer while it downloads and builds.
+This opens the board in your browser at <http://localhost:4242>. The folder is created if it doesn't exist yet; leave it out to use the current one. The first run takes a little longer while it downloads and builds.
 
 | Option | What it does |
 |---|---|
@@ -20,6 +20,10 @@ This opens the board in your browser at <http://localhost:4242>. Leave out the f
 | `--user anna` | Your name in comments and history (see [Who you are](#who-you-are)) |
 | `--no-open` | Don't open the browser automatically |
 | `--help` | Show usage |
+
+### Starting a new board
+
+A new, empty board shows only **+ Column**. Click it to add your first column (for example `todo`), then use the **+** in that column to create your first card. Or just drop a few `.md` files into the folder; they show up right away.
 
 ## Cards
 
