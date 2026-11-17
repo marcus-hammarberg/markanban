@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { orderColumns, parseConfig, setConfigColumns, typeColor } from './board.ts';
+import { orderColumns, parseConfig, placeCard, rankOrder, setConfigColumns, typeColor } from './board.ts';
 
 test('common order first, then alphabetical', () => {
   assert.deepEqual(orderColumns(['zeta', 'Done', 'alpha', 'todo', 'In Progress'], []), ['todo', 'In Progress', 'Done', 'alpha', 'zeta']);
@@ -53,4 +53,38 @@ test('setting columns keeps other keys and comments', () => {
   const out = setConfigColumns('# mine\nnoStatusColumn: Inbox\n', ['b', 'a']);
   assert.match(out, /# mine/);
   assert.deepEqual(parseConfig(out), { columns: ['b', 'a'], noStatusColumn: 'Inbox', types: {}, warnings: [] });
+});
+
+const card = (name: string, rank: number | null, created = '2026-01-01T00:00:00Z') => ({ name, rank, created });
+
+test('rankOrder: ranked by number, then unranked oldest first', () => {
+  const sorted = [card('u2', null, '2026-02-01'), card('r2', 2000), card('u1', null, '2026-01-01'), card('r1', 1000)].sort(rankOrder);
+  assert.deepEqual(sorted.map((c) => c.name), ['r1', 'r2', 'u1', 'u2']);
+});
+
+test('placeCard: halfway between neighbours, only the moved card changes', () => {
+  const col = [card('a', 1000), card('b', 2000)];
+  assert.deepEqual(placeCard(col, 'b'), { rank: 1500, updates: [] });
+  assert.deepEqual(placeCard(col, 'a'), { rank: 0, updates: [] });
+  assert.deepEqual(placeCard(col, null), { rank: 3000, updates: [] });
+  assert.deepEqual(placeCard([], null), { rank: 1000, updates: [] });
+});
+
+test('placeCard: unranked cards above the drop point get a rank first; below are left alone', () => {
+  const col = [card('a', 1000), card('b', null), card('c', null)];
+  assert.deepEqual(placeCard(col, 'c'), { rank: 3000, updates: [{ name: 'b', rank: 2000 }] });
+  assert.deepEqual(placeCard(col, 'b'), { rank: 2000, updates: [] });
+  assert.deepEqual(placeCard([card('x', null), card('y', null)], null),
+    { rank: 3000, updates: [{ name: 'x', rank: 1000 }, { name: 'y', rank: 2000 }] });
+});
+
+test('placeCard: renumbers the column in steps of 1000 when the gap runs out', () => {
+  const col = [card('a', 1000), card('b', 1000.0005), card('c', null)];
+  assert.deepEqual(placeCard(col, 'b'), { rank: 2000, updates: [{ name: 'b', rank: 3000 }] });
+  // Equal (hand-edited) ranks also trigger a renumber.
+  assert.deepEqual(placeCard([card('a', 5), card('b', 5)], 'b'), { rank: 2000, updates: [{ name: 'a', rank: 1000 }, { name: 'b', rank: 3000 }] });
+});
+
+test('placeCard: unknown target card is an error', () => {
+  assert.throws(() => placeCard([card('a', 1000)], 'zzz'), /zzz/);
 });

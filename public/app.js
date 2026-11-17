@@ -148,18 +148,27 @@ async function load() {
 function cardEl(card) {
   return h('article', {
     class: 'card',
+    'data-name': card.name,
     'data-color': card.color, // decided by the server; CSS maps it to the theme's color
+    tabindex: '0',
     draggable: card.archived ? 'false' : 'true',
     ondragstart: (e) => {
       e.dataTransfer.setData('text/x-card', card.name);
+      draggingCard = card.name;
       e.currentTarget.classList.add('dragging');
     },
-    ondragend: (e) => e.currentTarget.classList.remove('dragging'),
+    ondragend: (e) => {
+      draggingCard = null;
+      clearMarkers();
+      e.currentTarget.classList.remove('dragging');
+    },
     onclick: () => openCard(card),
+    onkeydown: (e) => cardKeys(e, card),
   },
   h('div', { class: 'heading' }, card.heading),
   card.conflict && h('div', { class: 'warn' }, '⚠️ Possible sync conflict copy'),
   card.error && h('div', { class: 'warn' }, '⚠️ Front-matter has invalid YAML'),
+  card.rankError && h('div', { class: 'warn', title: card.rankError }, '⚠️ Invalid rank, fixed on next move'),
   (card.type || card.assignee || card.comments.length > 0) && h('div', { class: 'meta' },
     card.type && h('span', { class: 'type-chip' }, card.type),
     card.assignee && h('span', {}, `@${card.assignee}`),
@@ -169,24 +178,90 @@ function cardEl(card) {
     Object.entries(card.extra).map(([k, v]) => h('span', { class: 'chip extra' }, `${k}: ${v}`))) : null);
 }
 
-function moveCard(name, status) {
+// Card order: the browser only says where a card goes ("above card X" or the bottom, before = null);
+// the server works out ranks and returns the cards in order.
+let draggingCard = null; // drag data can't be read during dragover, so remember the name
+
+function moveCard(name, status, before) {
   const card = board.cards.find((c) => c.name === name);
-  if (!card || card.status === status) return;
-  act(() => api('PATCH', `/api/cards/${encodeURIComponent(name)}`, { fields: { status: status ?? '' } }));
+  if (!card) return;
+  const sameColumn = (card.status ?? null) === status;
+  if (sameColumn) {
+    // Dropped where it already is: nothing to do.
+    const names = [...document.querySelectorAll('.card')].filter((el) => el.closest('.column') === cardColumn(name)).map((el) => el.dataset.name);
+    if ((names[names.indexOf(name) + 1] ?? null) === before) return;
+  }
+  const body = { place: { before } };
+  if (!sameColumn) body.fields = { status: status ?? '' };
+  act(() => api('PATCH', `/api/cards/${encodeURIComponent(name)}`, body));
 }
 
-function dropZone(el, onCard) {
+const cardColumn = (name) => document.querySelector(`.card[data-name="${CSS.escape(name)}"]`)?.closest('.column');
+
+// The visible card the dragged card would land above, or null for the bottom of the column.
+function insertionPoint(columnEl, y) {
+  for (const el of columnEl.querySelectorAll('.card')) {
+    if (el.dataset.name === draggingCard) continue;
+    const r = el.getBoundingClientRect();
+    if (y < r.top + r.height / 2) return el.dataset.name;
+  }
+  return null;
+}
+
+function clearMarkers() {
+  document.querySelectorAll('.insert-before, .insert-end').forEach((el) => el.classList.remove('insert-before', 'insert-end'));
+}
+
+// positioned: dropping shows (and uses) the exact spot between cards; otherwise the card goes to the bottom.
+function dropZone(el, onCard, positioned = false) {
   el.addEventListener('dragover', (e) => {
     if (!e.dataTransfer.types.includes('text/x-card')) return;
     e.preventDefault();
     el.classList.add('over');
+    if (!positioned) return;
+    clearMarkers();
+    const before = insertionPoint(el, e.clientY);
+    if (before) el.querySelector(`.card[data-name="${CSS.escape(before)}"]`).classList.add('insert-before');
+    else el.classList.add('insert-end');
   });
-  el.addEventListener('dragleave', (e) => { if (!el.contains(e.relatedTarget)) el.classList.remove('over'); });
+  el.addEventListener('dragleave', (e) => {
+    if (el.contains(e.relatedTarget)) return;
+    el.classList.remove('over');
+    clearMarkers();
+  });
   el.addEventListener('drop', (e) => {
     el.classList.remove('over');
     const name = e.dataTransfer.getData('text/x-card');
-    if (name) { e.preventDefault(); onCard(name); }
+    const before = positioned ? insertionPoint(el, e.clientY) : null;
+    clearMarkers();
+    if (name) { e.preventDefault(); onCard(name, before); }
   });
+}
+
+// Keyboard: Enter opens; Alt+↑/↓ moves within the column; Alt+←/→ moves to the bottom of the next column.
+function cardKeys(e, card) {
+  if (e.target !== e.currentTarget) return;
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCard(card); return; }
+  if (!e.altKey || card.archived) return;
+  const names = [...e.currentTarget.closest('.column').querySelectorAll('.card')].map((el) => el.dataset.name);
+  const i = names.indexOf(card.name);
+  let status = card.status ?? null;
+  let before;
+  if (e.key === 'ArrowUp') {
+    if (i <= 0) return;
+    before = names[i - 1];
+  } else if (e.key === 'ArrowDown') {
+    if (i === names.length - 1) return;
+    before = names[i + 2] ?? null;
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    const keys = board.columns.map((c) => c.key);
+    const j = keys.indexOf(status) + (e.key === 'ArrowLeft' ? -1 : 1);
+    if (j < 0 || j >= keys.length) return;
+    status = keys[j];
+    before = null;
+  } else return;
+  e.preventDefault();
+  moveCard(card.name, status, before);
 }
 
 function saveColumnOrder(order) {
@@ -258,7 +333,7 @@ function columnEl(col, cards) {
     },
   }, '+'));
   const el = h('section', { class: 'column' }, head, cards.map(cardEl));
-  dropZone(el, (name) => moveCard(name, col.key));
+  dropZone(el, (name, before) => moveCard(name, col.key, before), true);
   if (movable) columnDropZone(el, col.key);
   return el;
 }
@@ -284,7 +359,7 @@ function render() {
   }, '+ Column');
   dropZone(newCol, (name) => {
     const status = prompt('Status for the new column')?.trim();
-    if (status) moveCard(name, status);
+    if (status) moveCard(name, status, null);
   });
 
   const archived = showArchived.checked ? visible.filter((c) => c.archived) : [];
@@ -292,7 +367,10 @@ function render() {
     h('div', { class: 'column-head' }, h('span', { class: 'title' }, 'Archived'), h('span', { class: 'count' }, String(archived.length))),
     archived.map(cardEl)) : null;
 
+  // Every redraw (own actions and live updates) keeps keyboard focus on the same card.
+  const focused = document.activeElement?.closest?.('#board .card')?.dataset.name;
   boardEl.replaceChildren(...cols, newCol, ...(archivedCol ? [archivedCol] : []));
+  if (focused) boardEl.querySelector(`.card[data-name="${CSS.escape(focused)}"]`)?.focus();
 }
 
 // --- card dialog -----------------------------------------------------------

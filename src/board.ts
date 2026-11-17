@@ -101,3 +101,58 @@ export function orderColumns(statuses: string[], configured: string[]): string[]
     .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
   return [...new Set(configured), ...rest];
 }
+
+// ---- Card order within a column (priority: top = most important) ----
+
+const STEP = 1000;
+const MIN_GAP = 0.001;
+
+export interface Rankable { name: string; rank: number | null; created: string }
+
+/** Ranked cards by number, then unranked cards oldest first. */
+export function rankOrder(a: Rankable, b: Rankable): number {
+  if (a.rank !== null && b.rank !== null) return a.rank - b.rank || a.name.localeCompare(b.name);
+  if (a.rank !== null) return -1;
+  if (b.rank !== null) return 1;
+  return a.created.localeCompare(b.created) || a.name.localeCompare(b.name);
+}
+
+const tidy = (n: number) => Math.round(n * 1e6) / 1e6;
+
+/**
+ * Where a card lands when placed above `before` (or at the bottom when null) in `column`
+ * (sorted with rankOrder, without the card being moved). Returns the moved card's new rank,
+ * plus rank updates for other cards: unranked cards above the drop point, or the whole column
+ * when the gap has run out.
+ */
+export function placeCard(column: Rankable[], before: string | null): { rank: number; updates: { name: string; rank: number }[] } {
+  const at = before === null ? column.length : column.findIndex((c) => c.name === before);
+  if (at < 0) throw new Error(`No card "${before}" in that column`);
+  const updates = new Map<string, number>();
+
+  // Cards above the drop point need a rank so the moved card can sort after them.
+  let above: number | null = null;
+  for (const c of column.slice(0, at)) {
+    const rank: number = c.rank ?? (above ?? 0) + STEP;
+    if (c.rank === null) updates.set(c.name, rank);
+    above = rank;
+  }
+  const below = column[at]?.rank ?? null; // an unranked card below is no upper bound
+
+  let rank: number;
+  if (below === null) rank = (above ?? 0) + STEP;
+  else if (above === null) rank = below - STEP;
+  else if (below - above >= MIN_GAP * 2) rank = tidy((above + below) / 2);
+  else {
+    // Gap used up: renumber this column (ranked cards and the moved one) in clean steps.
+    const order: (Rankable | null)[] = [...column.slice(0, at), null, ...column.slice(at).filter((c) => c.rank !== null)];
+    rank = 0;
+    order.forEach((c, i) => {
+      const r = (i + 1) * STEP;
+      if (c === null) rank = r; // the moved card
+      else if (c.rank !== r) updates.set(c.name, r);
+      else updates.delete(c.name);
+    });
+  }
+  return { rank, updates: [...updates].map(([name, r]) => ({ name, rank: r })) };
+}

@@ -87,6 +87,9 @@ button.icon:hover { background: var(--surface); border-color: var(--border-stron
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; box-shadow: var(--shadow); cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
 .card:hover { box-shadow: var(--shadow-lift); }
 .card.dragging { opacity: 0.4; }
+/* Where a dragged card will land: above a card, or at the bottom of the column. */
+.card.insert-before { box-shadow: 0 -3px 0 var(--accent); }
+.column.insert-end { box-shadow: inset 0 -3px 0 var(--accent); }
 .card .heading { font-weight: 600; overflow-wrap: anywhere; }
 .card .meta { color: var(--muted); font-size: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
 /* Type color: the server sends data-color; this only maps the name to the theme's shade. */

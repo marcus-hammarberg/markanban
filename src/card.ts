@@ -3,7 +3,7 @@
 // the user wrote (comments, key order, unknown fields, line endings) survives.
 import { parseDocument, isSeq, YAMLSeq, type Document } from 'yaml';
 
-export const KNOWN = ['heading', 'status', 'type', 'assignee', 'tags', 'created', 'archived'] as const;
+export const KNOWN = ['heading', 'status', 'type', 'assignee', 'tags', 'created', 'archived', 'rank'] as const;
 export const EDITABLE = ['heading', 'status', 'type', 'assignee', 'tags'];
 
 export interface Card {
@@ -15,6 +15,8 @@ export interface Card {
   tags: string[];
   created: string;
   archived: string | null;
+  rank: number | null; // position in its column: lower is higher up (more important)
+  rankError?: string;
   mtime: string;
   body: string;
   history: string[];
@@ -31,6 +33,7 @@ export interface Change {
   body?: string;
   archive?: boolean;
   comment?: string;
+  rank?: number; // board housekeeping: written to front-matter, never logged
 }
 
 // File layout: [front-matter] body [## Comments] [## Changelog] — the last two are optional.
@@ -101,6 +104,13 @@ function readDoc(fm: string | null) {
   return { doc, error, data: typeof data === 'object' && !Array.isArray(data) ? data : {} };
 }
 
+// A broken hand-written rank is treated as "no rank" and flagged; the next move fixes it.
+function parseRank(v: unknown): { rank: number | null; rankError?: string } {
+  if (v == null) return { rank: null };
+  if (typeof v === 'number' && Number.isFinite(v)) return { rank: v };
+  return { rank: null, rankError: `rank must be a number (found ${JSON.stringify(v)})` };
+}
+
 export function parseCard(raw: string, meta: FileMeta): Card {
   const p = split(raw);
   const { data, error } = readDoc(p.fm);
@@ -117,6 +127,7 @@ export function parseCard(raw: string, meta: FileMeta): Card {
     tags: toTags(data.tags),
     created: str(data.created) ?? meta.created,
     archived: str(data.archived),
+    ...parseRank(data.rank),
     mtime: meta.mtime,
     body: p.body,
     history: (p.log ?? '').split('\n').filter((l) => l.startsWith('- ')).map((l) => l.slice(2)),
@@ -204,18 +215,24 @@ export function applyChange(raw: string, change: Change, who: string, now: strin
     log.push(`- ${now} ${who} comment: added`);
   }
 
-  if (!log.length) return raw;
+  if (change.rank !== undefined && data.rank !== change.rank) setKey(doc, 'rank', change.rank);
+
+  if (!log.length && !docChanged) return raw;
 
   let head = p.head;
   if (docChanged) {
     const empty = (doc.contents as { items?: unknown[] } | null)?.items?.length === 0 || doc.contents == null;
     head = empty ? '' : `---\n${String(doc)}---\n`;
   }
+  const eol = (out: string) => (p.eol === '\n' ? out : out.replace(/\n/g, p.eol));
+  // Front-matter-only change (rank): leave the rest of the file exactly as it was.
+  if (!log.length) return eol(head + p.body + (p.comments ?? '') + (p.log ?? ''));
+
   // Sections followed by another section end with a blank line.
   const spaced = (s: string) => (s === '' ? '' : s.replace(/\n*$/, '\n\n'));
   const tail = spaceHeadings((p.log ?? '## Changelog\n').replace(/\n*$/, '\n'));
   const out = head + spaced(p.body) + (comments === null ? '' : spaced(spaceHeadings(comments))) + tail + log.join('\n') + '\n';
-  return p.eol === '\n' ? out : out.replace(/\n/g, p.eol);
+  return eol(out);
 }
 
 export function slug(heading: string): string {

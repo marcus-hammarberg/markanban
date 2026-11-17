@@ -56,6 +56,7 @@ Users get logged out after 5 minutes.
 | `tags` | Comma string (`ui, auth`) or YAML list (`[ui, auth]`). Read both; write back in the form already used; new cards use comma string. |
 | `created` | ISO UTC timestamp. Written only when the card is created via the UI. Missing → display file birthtime (never written back). |
 | `archived` | ISO UTC timestamp. Present = archived, absent = active. |
+| `rank` | Number: the card's position in its column (lower = higher up = more important). Managed by the board, hidden on the card, never logged. See Card order. |
 
 - **No `changed` field.** "Last changed" is displayed from file mtime.
 - **Unknown fields** (e.g. `priority`, `due`) are preserved untouched — comments and key order too — and shown as read-only `key: value` chips.
@@ -161,6 +162,19 @@ Drag a column by its header (⠿ grip) and drop it on either half of another col
 - A theme = one CSS file, activated by `<html data-theme="…">`. Themes may override any rule, not just variables (so a hand-drawn theme can change fonts, borders, rotation, filters).
 - v1 ships **light** and **dark**. Default follows the OS (`prefers-color-scheme`). Header toggle: System → Light → Dark; a manual choice is saved in `localStorage`.
 
+### Card order (priority)
+
+Order within a column is a priority signal: the top card is the most important. Each card carries its own position as `rank` in its front-matter, so a move only touches that card's file (no shared file to conflict on when the folder is synced).
+
+- Sort: ranked cards by `rank` ascending, then unranked cards oldest first (`created`). New cards from **+** get no rank, so they land at the bottom.
+- Placing a card gives it the number halfway between its neighbours (ranks start at 1000 and step by 1000). Unranked cards above the drop point get a rank first; cards below are left alone. When a gap gets too small (< 0.001), that one column is renumbered in steps of 1000.
+- Moving to another column is one write: `status` (logged) and `rank` (not logged). Rank changes and renumbering are never logged.
+- The browser only sends the intent, `place: { before: <card name> | null }` (null = bottom) on `PATCH /api/cards/:name`; the server computes ranks and returns cards in order.
+- With a filter on, a card dropped above a visible card lands directly above that card.
+- Keyboard: cards are focusable (Tab). Enter opens; Alt+↑/↓ moves within the column; Alt+←/→ moves to the bottom of the neighbouring column. Focus stays on the card.
+- A hand-written rank that isn't a number is treated as unranked and shows ⚠️ on the card; the next move that places it fixes it.
+- Archived cards keep their rank, so unarchiving puts them back where they were.
+
 ### Type colors
 
 Cards are color-coded by `type`: a 4px stripe on the left edge plus a tinted type chip. The type is always shown as text too, and there is no legend.
@@ -242,6 +256,9 @@ A separate, read-only mode that plays back how cards moved across the board over
 **Board**
 - Statuses no longer in use appear as a column only while they hold cards, ordered by the normal column rules.
 - Moving cards slide between columns (Web Animations API, no dependency). New cards fade in, archived fade out. Animations are cut short at high speed so they never lag the clock.
+
+**Card order**
+- Ranks aren't logged, so order changes can't be replayed; cards in a replayed column are shown in their current order. Revisit these decisions when building replay.
 
 **Known gap (accepted)**
 - Edits made outside the UI aren't in the changelog, so such a card jumps to its current column at the end. Replay is only as complete as the changelog.

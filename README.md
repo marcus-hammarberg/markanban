@@ -58,7 +58,7 @@ Every field is optional:
 | `tags` | `ui, auth` or `[ui, auth]` |
 | `heading` | The card title. Without it, the first `# Heading` in the text is used, then the file name (`fix-login-bug.md` → "fix login bug") |
 
-Any other field (like `priority` above) is kept as-is and shown as a small label on the card.
+Any other field (like `priority` above) is kept as-is and shown as a small label on the card. Markanban also adds a `rank` field when you reorder cards; it stores the card's position and isn't shown.
 
 ## Columns
 
@@ -68,7 +68,8 @@ To change the order, drag a column by its header (⠿), or hover over the header
 
 ## Working with cards
 
-- **Move** a card by dragging it to another column.
+- **Move** a card by dragging it to another column, or up and down within one. The order is your priority: the top card matters most. A line shows where the card will land.
+- **Keyboard**: Tab to a card, Enter opens it, Alt+↑/↓ moves it up or down, Alt+←/→ moves it to the next column.
 - **Create** a card with the **+** in a column header. It becomes a new file named after its heading.
 - **Edit** by clicking a card: change its fields and text, then **Save** (or press Ctrl/⌘+Enter).
 - **Comment** at the bottom of the card. Comments are saved in the card file.

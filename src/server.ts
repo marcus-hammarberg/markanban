@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyChange, newCard, parseCard, slug, type Change } from './card.ts';
-import { CONFIG_FILE, orderColumns, parseConfig, setConfigColumns, typeColor } from './board.ts';
+import { CONFIG_FILE, orderColumns, parseConfig, placeCard, rankOrder, setConfigColumns, typeColor } from './board.ts';
 import type { Storage } from './storage.ts';
 
 const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
@@ -50,7 +50,7 @@ export function createServer(storage: Storage, user: string) {
     const cards = (await storage.list()).map((f) => {
       const card = parseCard(f.text, f);
       return { ...card, color: typeColor(card.type, config.types) };
-    });
+    }).sort(rankOrder); // within each column: priority order, top first
     const active = cards.filter((c) => !c.archived);
     const columns = orderColumns(active.flatMap((c) => (c.status ? [c.status] : [])), config.columns)
       .map((s) => ({ key: s as string | null, label: s }));
@@ -88,6 +88,27 @@ export function createServer(storage: Storage, user: string) {
       if (typeof body.archive !== 'boolean') throw new HttpError(400, 'archive must be a boolean');
       change.archive = body.archive;
     }
+    // Card order: the browser says where ("above card X", or the bottom); the server ranks.
+    let rankUpdates: { name: string; rank: number }[] = [];
+    if (body.place !== undefined) {
+      const place = body.place as { before?: unknown } | null;
+      if (!place || typeof place !== 'object' || !('before' in place) || (place.before !== null && typeof place.before !== 'string')) {
+        throw new HttpError(400, 'place must be { "before": <card name> | null }');
+      }
+      const { cards } = await board();
+      const card = cards.find((c) => c.name === name);
+      if (!card) throw new HttpError(404, `No card ${name}`);
+      const status = change.fields && 'status' in change.fields ? change.fields.status?.trim() || null : card.status;
+      const column = cards.filter((c) => !c.archived && c.name !== name && c.status === status).sort(rankOrder);
+      try {
+        const plan = placeCard(column, place.before);
+        change.rank = plan.rank;
+        rankUpdates = plan.updates;
+      } catch (e) {
+        throw new HttpError(400, (e as Error).message);
+      }
+    }
+
     // Re-read right before writing so external edits are never overwritten with a stale copy.
     const raw = await storage.read(name);
     if (raw === null) throw new HttpError(404, `No card ${name}`);
@@ -97,9 +118,15 @@ export function createServer(storage: Storage, user: string) {
     } catch (e) {
       throw new HttpError(400, (e as Error).message);
     }
-    if (next === raw) return { name };
+    if (next === raw && !rankUpdates.length) return { name };
     const before = await statusColumns();
-    await storage.write(name, next);
+    for (const u of rankUpdates) {
+      const text = await storage.read(u.name);
+      if (text === null) continue;
+      const ranked = applyChange(text, { rank: u.rank }, user, now());
+      if (ranked !== text) await storage.write(u.name, ranked);
+    }
+    if (next !== raw) await storage.write(name, next);
     await keepColumns(before);
     return { name };
   }

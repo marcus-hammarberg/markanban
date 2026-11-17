@@ -147,3 +147,49 @@ test('a column emptied from the board stays (saved to .markanban.yml); others st
   await patch('c.md', { archive: true });
   assert.deepEqual(await columns(), ['Todo', 'Doing', 'Review']);
 });
+
+test('card order: the browser says where, the server ranks, sorts and never logs rank', async (t) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'markanban-'));
+  await writeFile(path.join(dir, 'a.md'), '---\nstatus: todo\nrank: 1000\n---\n# A\n');
+  await writeFile(path.join(dir, 'b.md'), '---\nstatus: todo\nrank: 2000\n---\n# B\n');
+  await writeFile(path.join(dir, 'c.md'), '---\nstatus: todo\n---\n# C\n');
+  await writeFile(path.join(dir, 'd.md'), '---\nstatus: doing\n---\n# D\n');
+  await writeFile(path.join(dir, 'e.md'), '---\nstatus: doing\nrank: oops\n---\n# E\n');
+  const server = createServer(createStorage(dir), 'tester');
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const base = `http://localhost:${(server.address() as AddressInfo).port}`;
+  const patch = (name: string, body: unknown) =>
+    fetch(`${base}/api/cards/${name}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const order = async (status: string) => (await (await fetch(`${base}/api/board`)).json()).cards
+    .filter((c: { status: string }) => c.status === status).map((c: { name: string }) => c.name);
+  const file = (name: string) => readFile(path.join(dir, name), 'utf8');
+
+  assert.deepEqual(await order('todo'), ['a.md', 'b.md', 'c.md']);
+  const board = await (await fetch(`${base}/api/board`)).json();
+  assert.match(board.cards.find((c: { name: string }) => c.name === 'e.md').rankError, /rank must be a number/);
+
+  // Move D into todo, above B: one write, halfway rank, status logged, rank not.
+  assert.equal((await patch('d.md', { fields: { status: 'todo' }, place: { before: 'b.md' } })).status, 200);
+  assert.deepEqual(await order('todo'), ['a.md', 'd.md', 'b.md', 'c.md']);
+  assert.match(await file('d.md'), /^rank: 1500$/m);
+  assert.match(await file('d.md'), /status: doing → todo\n$/);
+  assert.doesNotMatch(await file('d.md'), /rank: .* →/);
+
+  // A to the bottom: unranked C above the drop point gets a rank first, without a changelog.
+  await patch('a.md', { place: { before: null } });
+  assert.deepEqual(await order('todo'), ['d.md', 'b.md', 'c.md', 'a.md']);
+  assert.equal(await file('c.md'), '---\nstatus: todo\nrank: 3000\n---\n# C\n');
+  assert.equal(await file('a.md'), '---\nstatus: todo\nrank: 4000\n---\n# A\n');
+
+  // The next move fixes a broken rank.
+  await patch('e.md', { place: { before: null } });
+  assert.match(await file('e.md'), /^rank: 1000$/m);
+
+  // Refusals: unknown target, a target in another column, a malformed place.
+  assert.equal((await patch('b.md', { place: { before: 'zzz.md' } })).status, 400);
+  assert.equal((await patch('b.md', { place: { before: 'e.md' } })).status, 400);
+  assert.equal((await patch('b.md', { place: 'top' })).status, 400);
+  assert.equal((await patch('b.md', { place: { before: 5 } })).status, 400);
+  assert.deepEqual(await order('todo'), ['d.md', 'b.md', 'c.md', 'a.md']);
+});

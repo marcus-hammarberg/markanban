@@ -195,3 +195,28 @@ test('written sections satisfy markdownlint MD022, also when upgrading the old l
   assert.deepEqual(parseCard(out, meta).comments.map((c) => c.text), ['old', 'new']);
   assert.ok(headingsSpaced(newCard('X', null, 'm', NOW).replace(/^---[\s\S]*?---\n# X\n/, '')));
 });
+
+test('rank: parsed as a hidden number; bad values are flagged, not shown', () => {
+  const c = parseCard('---\nstatus: todo\nrank: 1500.5\n---\n', meta);
+  assert.equal(c.rank, 1500.5);
+  assert.equal(c.rankError, undefined);
+  assert.deepEqual(c.extra, {});
+  assert.equal(parseCard('no front-matter', meta).rank, null);
+  const bad = parseCard('---\nrank: high\n---\n', meta);
+  assert.equal(bad.rank, null);
+  assert.match(String(bad.rankError), /rank must be a number/);
+  assert.deepEqual(bad.extra, {});
+});
+
+test('rank changes rewrite only the front-matter and are never logged', () => {
+  const out = applyChange(sample, { rank: 2000 }, 'm', NOW);
+  assert.equal(out, sample.replace('priority: high\n', 'priority: high\nrank: 2000\n'));
+  assert.equal(applyChange(out, { rank: 2000 }, 'm', NOW), out);
+  // No changelog section is created for a rank-only change.
+  assert.equal(applyChange('# Hi\n', { rank: 1000 }, 'm', NOW), '---\nrank: 1000\n---\n# Hi\n');
+  // Moving to another column: status is logged, rank is not.
+  const moved = applyChange(sample, { fields: { status: 'doing' }, rank: 500 }, 'm', NOW);
+  assert.match(moved, /^rank: 500$/m);
+  assert.match(moved, /status: todo → doing\n$/);
+  assert.doesNotMatch(moved, /rank: .* → /);
+});
