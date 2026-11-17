@@ -113,6 +113,25 @@ Actions:
 
 **No delete** in v1. Remove the file yourself.
 
+### Comments
+
+Stored in the card file as a `## Comments` section between the body and `## Changelog`:
+
+```markdown
+## Comments
+### 2026-11-17T09:12:00Z marcus
+Session timeout is 5 minutes.
+Checked in staging.
+
+## Changelog
+- 2026-11-17T09:12:00Z marcus comment: added
+```
+
+- One `### <ISO UTC> <who>` heading per comment, oldest first; text is markdown and may be multi-line.
+- Headings (`#`–`###`) inside a comment are demoted to `####` so they can't end the comment or section.
+- Add-only in the UI; edit or delete by editing the file. Each add logs `comment: added` in the changelog.
+- Hidden from the body textarea; shown as a list with an "Add comment" box (⌘/Ctrl+Enter submits). Cards show a 💬 count. Search includes comment text.
+
 ### Filters
 
 A row above the board: free-text search (heading + body), and selects for type, assignee and tag, each with a "No …" option. Options are built from the current cards. Filters combine, apply to archived cards too, are client-side only, and reset on reload.

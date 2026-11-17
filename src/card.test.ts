@@ -120,6 +120,51 @@ test('refuses to write into invalid YAML', () => {
   assert.throws(() => applyChange('---\nstatus: [oops\n---\n', { fields: { status: 'x' } }, 'm', NOW));
 });
 
+test('comments: added between body and changelog, logged, kept out of the body', () => {
+  const out = applyChange(sample, { comment: 'First!\n## Changelog\nsecond line' }, 'anna', NOW);
+  assert.equal(out, `---
+# keep me
+status: todo
+tags: ui, auth
+priority: high
+---
+# Fix login bug
+
+Some text.
+
+## Comments
+### ${NOW} anna
+First!
+#### Changelog
+second line
+
+## Changelog
+- 2026-11-01T00:00:00Z anna status: (none) → todo
+- ${NOW} anna comment: added
+`);
+  const c = parseCard(out, meta);
+  assert.equal(c.body, '# Fix login bug\n\nSome text.\n\n');
+  assert.deepEqual(c.comments, [{ at: NOW, who: 'anna', text: 'First!\n#### Changelog\nsecond line' }]);
+  assert.equal(c.history.length, 2);
+
+  const two = applyChange(out, { comment: 'Second' }, 'marcus', 'T2');
+  assert.deepEqual(parseCard(two, meta).comments.map((x) => x.text), ['First!\n#### Changelog\nsecond line', 'Second']);
+  assert.match(two, /second line\n\n### T2 marcus\nSecond\n\n## Changelog/);
+});
+
+test('comment on a bare file; empty comment is refused', () => {
+  assert.equal(applyChange('Hi\n', { comment: 'yo' }, 'm', NOW), `Hi\n\n## Comments\n### ${NOW} m\nyo\n\n## Changelog\n- ${NOW} m comment: added\n`);
+  assert.throws(() => applyChange('Hi\n', { comment: '  ' }, 'm', NOW));
+});
+
+test('body edit keeps existing comments', () => {
+  const withComment = applyChange(sample, { comment: 'keep me' }, 'm', NOW);
+  const out = applyChange(withComment, { body: 'New' }, 'm', NOW);
+  const c = parseCard(out, meta);
+  assert.equal(c.body, 'New\n\n');
+  assert.equal(c.comments[0].text, 'keep me');
+});
+
 test('newCard writes status, created and H1; slug is filename-safe', () => {
   const raw = newCard('Fix: Åsa’s login!', 'todo', NOW);
   const c = parseCard(raw, meta);

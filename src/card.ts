@@ -18,6 +18,7 @@ export interface Card {
   mtime: string;
   body: string;
   history: string[];
+  comments: Comment[];
   extra: Record<string, string>;
   conflict: boolean;
   error?: string;
@@ -29,9 +30,17 @@ export interface Change {
   fields?: Record<string, string | null>;
   body?: string;
   archive?: boolean;
+  comment?: string;
 }
 
-interface Parts { eol: string; head: string; fm: string | null; body: string; log: string | null }
+// File layout: [front-matter] body [## Comments] [## Changelog] — the last two are optional.
+interface Parts { eol: string; head: string; fm: string | null; body: string; comments: string | null; log: string | null }
+
+const lastHeading = (text: string, re: RegExp) => {
+  let idx = -1;
+  for (const m of text.matchAll(re)) idx = m.index;
+  return idx;
+};
 
 function split(raw: string): Parts {
   const eol = raw.includes('\r\n') ? '\r\n' : '\n';
@@ -46,16 +55,32 @@ function split(raw: string): Parts {
       rest = lines.slice(close + 1).join('\n');
     }
   }
-  let idx = -1;
-  for (const m of rest.matchAll(/^## Changelog[ \t]*$/gm)) idx = m.index;
+  const logAt = lastHeading(rest, /^## Changelog[ \t]*$/gm);
+  const beforeLog = logAt < 0 ? rest : rest.slice(0, logAt);
+  const commentsAt = lastHeading(beforeLog, /^## Comments[ \t]*$/gm);
   return {
     eol,
     head: text.slice(0, text.length - rest.length),
     fm,
-    body: idx < 0 ? rest : rest.slice(0, idx),
-    log: idx < 0 ? null : rest.slice(idx),
+    body: commentsAt < 0 ? beforeLog : beforeLog.slice(0, commentsAt),
+    comments: commentsAt < 0 ? null : beforeLog.slice(commentsAt),
+    log: logAt < 0 ? null : rest.slice(logAt),
   };
 }
+
+export interface Comment { at: string; who: string; text: string }
+
+function parseComments(section: string | null): Comment[] {
+  if (!section) return [];
+  return section.split(/^### /m).slice(1).map((chunk) => {
+    const [first, ...rest] = chunk.split('\n');
+    const [at = '', who = ''] = first.trim().split(/\s+/);
+    return { at, who, text: rest.join('\n').trim() };
+  });
+}
+
+// Headings inside a comment would end the comment (or the section), so demote them.
+const commentText = (text: string) => text.replace(/\r\n/g, '\n').trim().replace(/^#{1,3}(?=\s)/gm, '####');
 
 const str = (v: unknown) => (v == null || v === '' ? null : String(v));
 
@@ -95,6 +120,7 @@ export function parseCard(raw: string, meta: FileMeta): Card {
     mtime: meta.mtime,
     body: p.body,
     history: (p.log ?? '').split('\n').filter((l) => l.startsWith('- ')).map((l) => l.slice(2)),
+    comments: parseComments(p.comments),
     extra,
     conflict: CONFLICT.test(meta.name),
     ...(error ? { error } : {}),
@@ -166,6 +192,14 @@ export function applyChange(raw: string, change: Change, who: string, now: strin
   if (change.archive === true && !data.archived) { record('archived', null, now); setKey(doc, 'archived', now); }
   if (change.archive === false && data.archived) { record('archived', data.archived, null); setKey(doc, 'archived', null); }
 
+  let comments = p.comments;
+  if (change.comment !== undefined) {
+    const text = commentText(change.comment);
+    if (!text) throw new Error('Comment is empty');
+    comments = (comments ? comments.replace(/\s*$/, '\n\n') : '## Comments\n') + `### ${now} ${who}\n${text}\n`;
+    log.push(`- ${now} ${who} comment: added`);
+  }
+
   if (!log.length) return raw;
 
   let head = p.head;
@@ -173,16 +207,10 @@ export function applyChange(raw: string, change: Change, who: string, now: strin
     const empty = (doc.contents as { items?: unknown[] } | null)?.items?.length === 0 || doc.contents == null;
     head = empty ? '' : `---\n${String(doc)}---\n`;
   }
-  let body = p.body;
-  let tail = p.log;
-  if (tail === null) {
-    body = body === '' ? '' : body.replace(/\n*$/, '\n\n');
-    tail = '## Changelog\n';
-  } else if (!/\n\n$/.test(body) && body !== '') {
-    body = body.replace(/\n*$/, '\n\n');
-  }
-  if (!tail.endsWith('\n')) tail += '\n';
-  const out = head + body + tail + log.join('\n') + '\n';
+  // Sections followed by another section end with a blank line.
+  const spaced = (s: string) => (s === '' ? '' : s.replace(/\n*$/, '\n\n'));
+  const tail = (p.log ?? '## Changelog\n').replace(/\n*$/, '\n');
+  const out = head + spaced(p.body) + (comments === null ? '' : spaced(comments)) + tail + log.join('\n') + '\n';
   return p.eol === '\n' ? out : out.replace(/\n/g, p.eol);
 }
 

@@ -46,10 +46,13 @@ async function act(fn) {
   try {
     await fn();
     showError('');
+    return true;
   } catch (e) {
     showError(e.message);
+    return false;
+  } finally {
+    await load();
   }
-  await load();
 }
 
 const day = (iso) => (iso ? new Date(iso).toLocaleString() : '');
@@ -91,7 +94,8 @@ const filterEls = { q: $('#filter-q'), type: $('#filter-type'), assignee: $('#fi
 
 function matches(card) {
   const q = filterEls.q.value.trim().toLowerCase();
-  if (q && !`${card.heading}\n${card.body}`.toLowerCase().includes(q)) return false;
+  const text = [card.heading, card.body, ...card.comments.map((c) => c.text)].join('\n');
+  if (q && !text.toLowerCase().includes(q)) return false;
   for (const key of ['type', 'assignee']) {
     const v = filterEls[key].value;
     if (v && (v === NONE ? card[key] : card[key] !== v)) return false;
@@ -155,9 +159,10 @@ function cardEl(card) {
   h('div', { class: 'heading' }, card.heading),
   card.conflict && h('div', { class: 'warn' }, '⚠️ Possible sync conflict copy'),
   card.error && h('div', { class: 'warn' }, '⚠️ Front-matter has invalid YAML'),
-  (card.type || card.assignee) && h('div', { class: 'meta' },
+  (card.type || card.assignee || card.comments.length > 0) && h('div', { class: 'meta' },
     card.type && h('span', {}, card.type),
-    card.assignee && h('span', {}, `@${card.assignee}`)),
+    card.assignee && h('span', {}, `@${card.assignee}`),
+    card.comments.length > 0 && h('span', { title: `${card.comments.length} comment(s)` }, `💬 ${card.comments.length}`)),
   (card.tags.length || Object.keys(card.extra).length) ? h('div', { class: 'chips' },
     card.tags.map((t) => h('span', { class: 'chip' }, t)),
     Object.entries(card.extra).map(([k, v]) => h('span', { class: 'chip extra' }, `${k}: ${v}`))) : null);
@@ -299,13 +304,42 @@ function openCard(card) {
   form.body.value = card.body.trimEnd();
   form.querySelectorAll('input, textarea').forEach((el) => { el.disabled = !!card.error; });
   $('#extra').replaceChildren(...Object.entries(card.extra).map(([k, v]) => h('span', { class: 'chip extra', title: 'Edit in the file' }, `${k}: ${v}`)));
-  $('#history').replaceChildren(...(card.history.length ? card.history : ['No changes yet']).map((l) => h('li', {}, l)));
+  $('#new-comment').value = '';
+  $('#new-comment').disabled = $('#add-comment').disabled = !!card.error;
+  renderLog(card);
   $('#archive').textContent = card.archived ? 'Unarchive' : 'Archive';
-  $('#dates').textContent = [card.created && `Created ${day(card.created)}`, `Changed ${day(card.mtime)}`, card.archived && `Archived ${day(card.archived)}`]
-    .filter(Boolean).join(' · ');
   if (card.error) showError(`${card.name}: ${card.error}. Fix it in the file to edit this card.`);
   dialog.showModal();
 }
+
+// Comments, history and dates only, so it can refresh without touching unsaved field edits.
+function renderLog(card) {
+  $('#comments').replaceChildren(...(card.comments.length
+    ? card.comments.map((c) => h('li', { class: 'comment' },
+      h('div', { class: 'who' }, `${c.who} · ${day(c.at)}`),
+      h('div', { class: 'text' }, c.text)))
+    : [h('li', { class: 'empty' }, 'No comments yet')]));
+  $('#history').replaceChildren(...(card.history.length ? card.history : ['No changes yet']).map((l) => h('li', {}, l)));
+  $('#dates').textContent = [card.created && `Created ${day(card.created)}`, `Changed ${day(card.mtime)}`, card.archived && `Archived ${day(card.archived)}`]
+    .filter(Boolean).join(' · ');
+}
+
+async function addComment() {
+  const text = $('#new-comment').value;
+  if (!current || !text.trim()) return;
+  const name = current.name;
+  const ok = await act(() => api('PATCH', `/api/cards/${encodeURIComponent(name)}`, { comment: text }));
+  const updated = board.cards.find((c) => c.name === name);
+  if (!ok || !updated || current?.name !== name) return;
+  $('#new-comment').value = '';
+  current = updated;
+  renderLog(updated);
+}
+
+$('#add-comment').addEventListener('click', addComment);
+$('#new-comment').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); addComment(); }
+});
 
 function changes() {
   const fields = {};

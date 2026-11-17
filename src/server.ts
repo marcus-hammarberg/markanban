@@ -76,6 +76,7 @@ export function createServer(storage: Storage, user: string) {
       change.fields = Object.fromEntries(Object.entries(body.fields).map(([k, v]) => [k, optString(v, k) ?? null]));
     }
     if (body.body !== undefined) change.body = optString(body.body, 'body') ?? '';
+    if (body.comment !== undefined) change.comment = optString(body.comment, 'comment') ?? '';
     if (body.archive !== undefined) {
       if (typeof body.archive !== 'boolean') throw new HttpError(400, 'archive must be a boolean');
       change.archive = body.archive;
