@@ -148,6 +148,7 @@ async function load() {
 function cardEl(card) {
   return h('article', {
     class: 'card',
+    'data-color': card.color, // decided by the server; CSS maps it to the theme's color
     draggable: card.archived ? 'false' : 'true',
     ondragstart: (e) => {
       e.dataTransfer.setData('text/x-card', card.name);
@@ -160,7 +161,7 @@ function cardEl(card) {
   card.conflict && h('div', { class: 'warn' }, '⚠️ Possible sync conflict copy'),
   card.error && h('div', { class: 'warn' }, '⚠️ Front-matter has invalid YAML'),
   (card.type || card.assignee || card.comments.length > 0) && h('div', { class: 'meta' },
-    card.type && h('span', {}, card.type),
+    card.type && h('span', { class: 'type-chip' }, card.type),
     card.assignee && h('span', {}, `@${card.assignee}`),
     card.comments.length > 0 && h('span', { title: `${card.comments.length} comment(s)` }, `💬 ${card.comments.length}`)),
   (card.tags.length || Object.keys(card.extra).length) ? h('div', { class: 'chips' },
@@ -265,6 +266,8 @@ function columnEl(col, cards) {
 function render() {
   $('#title').textContent = board.folder ? `Markanban · ${board.folder}` : 'Markanban';
   document.title = $('#title').textContent;
+  $('#warnings').replaceChildren(...(board.warnings ?? []).map((w) => h('div', {}, `⚠️ ${w}`)));
+  $('#warnings').hidden = !board.warnings?.length;
   $('#status-list').replaceChildren(...board.columns.filter((c) => c.key).map((c) => h('option', { value: c.key })));
 
   refreshFilters();

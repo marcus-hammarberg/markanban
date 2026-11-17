@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyChange, newCard, parseCard, slug, type Change } from './card.ts';
-import { CONFIG_FILE, orderColumns, parseConfig, setConfigColumns } from './board.ts';
+import { CONFIG_FILE, orderColumns, parseConfig, setConfigColumns, typeColor } from './board.ts';
 import type { Storage } from './storage.ts';
 
 const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
@@ -46,12 +46,17 @@ export function createServer(storage: Storage, user: string) {
 
   async function board() {
     const config = parseConfig((await storage.read(CONFIG_FILE)) ?? '');
-    const cards = (await storage.list()).map((f) => parseCard(f.text, f));
+    // All board rules are decided here; the browser only displays the result.
+    const cards = (await storage.list()).map((f) => {
+      const card = parseCard(f.text, f);
+      return { ...card, color: typeColor(card.type, config.types) };
+    });
     const active = cards.filter((c) => !c.archived);
     const columns = orderColumns(active.flatMap((c) => (c.status ? [c.status] : [])), config.columns)
       .map((s) => ({ key: s as string | null, label: s }));
     if (active.some((c) => !c.status)) columns.unshift({ key: null, label: config.noStatusColumn });
-    return { folder: path.basename(storage.dir), user, config, columns, cards };
+    const { warnings, ...settings } = config;
+    return { folder: path.basename(storage.dir), user, config: settings, warnings, columns, cards };
   }
 
   async function createCard(body: Record<string, unknown>) {

@@ -14,5 +14,14 @@
   --danger: #e2574c;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-lift: 0 6px 16px rgb(0 0 0 / 0.5);
+  --type-red: #ff7a7a;
+  --type-orange: #ffa057;
+  --type-yellow: #e8c547;
+  --type-green: #2f8a4b;
+  --type-teal: #3cc4c4;
+  --type-blue: #6b9bff;
+  --type-purple: #b18cff;
+  --type-pink: #ff7ab8;
+  --type-grey: #9aa1b0;
   color-scheme: dark;
 }

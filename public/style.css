@@ -22,6 +22,17 @@
   --radius-sm: 4px;
   --gap: 12px;
   --column-width: 280px;
+  /* Type palette. Names (not hex) are what .markanban.yml uses; each theme sets its own shades.
+     Red and green differ clearly in lightness too, so they don't rely on hue alone. */
+  --type-red: #e04848;
+  --type-orange: #e07b1a;
+  --type-yellow: #c99a06;
+  --type-green: #17693a;
+  --type-teal: #138a8a;
+  --type-blue: #3366e0;
+  --type-purple: #8250d6;
+  --type-pink: #d0458f;
+  --type-grey: #8a909c;
   color-scheme: light;
 }
 
@@ -47,6 +58,8 @@ button.icon:hover { background: var(--surface); border-color: var(--border-stron
 .filters input, .filters select { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px; background: var(--bg); color: var(--text); }
 .filters input { flex: 0 1 240px; min-width: 120px; }
 .filters .active { border-color: var(--accent); }
+
+.warnings { background: color-mix(in srgb, var(--warn) 14%, var(--surface)); border-left: 4px solid var(--warn); padding: 6px 12px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
 
 .error { background: var(--danger); color: var(--accent-text); padding: 8px 16px; }
 
@@ -74,6 +87,19 @@ button.icon:hover { background: var(--surface); border-color: var(--border-stron
 .card.dragging { opacity: 0.4; }
 .card .heading { font-weight: 600; overflow-wrap: anywhere; }
 .card .meta { color: var(--muted); font-size: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+/* Type color: the server sends data-color; this only maps the name to the theme's shade. */
+.card[data-color] { border-left: 4px solid var(--card-color); padding-left: 7px; } /* keeps text aligned with uncolored cards */
+.card[data-color="red"] { --card-color: var(--type-red); }
+.card[data-color="orange"] { --card-color: var(--type-orange); }
+.card[data-color="yellow"] { --card-color: var(--type-yellow); }
+.card[data-color="green"] { --card-color: var(--type-green); }
+.card[data-color="teal"] { --card-color: var(--type-teal); }
+.card[data-color="blue"] { --card-color: var(--type-blue); }
+.card[data-color="purple"] { --card-color: var(--type-purple); }
+.card[data-color="pink"] { --card-color: var(--type-pink); }
+.card[data-color="grey"] { --card-color: var(--type-grey); }
+.type-chip { border: 1px solid var(--border-strong); border-radius: 999px; padding: 0 8px; color: var(--text); }
+.card[data-color] .type-chip { background: color-mix(in srgb, var(--card-color) 18%, transparent); border-color: color-mix(in srgb, var(--card-color) 60%, transparent); }
 .card .warn { color: var(--warn); font-size: 12px; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }

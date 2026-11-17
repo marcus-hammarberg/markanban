@@ -35,6 +35,18 @@ test('API: create, move, archive, reorder, and refuse unsafe requests', async (t
   assert.deepEqual(board.columns.map((c: { key: string | null }) => c.key), [null, 'done', 'doing']);
   assert.ok(board.cards.find((c: { name: string }) => c.name === 'loose.md').archived);
 
+  // Colors and config warnings are decided by the server.
+  await writeFile(path.join(dir, '.markanban.yml'), 'types:\n  chore: pink\n  bug: reddish\n');
+  await call('PATCH', '/api/cards/fix-bug.md', { fields: { type: 'Bug' } });
+  await call('PATCH', '/api/cards/fix-bug-2.md', { fields: { type: 'chore' } });
+  board = await (await call('GET', '/api/board')).json();
+  const color = (name: string) => board.cards.find((c: { name: string }) => c.name === name).color;
+  assert.equal(color('fix-bug.md'), 'red');
+  assert.equal(color('fix-bug-2.md'), 'pink');
+  assert.equal(color('loose.md'), null);
+  assert.equal(board.warnings.length, 1);
+  assert.match(board.warnings[0], /unknown color "reddish"/);
+
   // Refusals
   assert.equal((await call('PATCH', '/api/cards/..%2Fescape.md', { fields: { status: 'x' } })).status, 400);
   assert.equal((await call('PATCH', '/api/cards/fix-bug.md', { fields: { created: 'x' } })).status, 400);

@@ -12,6 +12,8 @@ npx markanban [folder]     # folder defaults to .
 - **Files are the truth.** The tool never holds state the files don't. Hand-editing a card is always allowed.
 - **Lightweight.** One runtime dependency (`yaml`). Everything else is Node 22+ built-ins.
 - **Built for later.** UI talks to an HTTP API only; all file access goes through one storage module, so a hosted / Google Drive version swaps storage, not the app.
+- **Dumb client.** All rules and decisions (column order, type colors, validation) live on the server in tested code; `/api/board` returns the results and the browser only displays them.
+- **Config problems never break the board.** Skip only the broken part, fall back to the default, and show a clear warning in the UI that names the valid values. Unparseable `.markanban.yml` is a warning too, never silently ignored.
 
 ## Cards
 
@@ -100,6 +102,8 @@ Lives in the board folder. Created lazily on first column reorder.
 ```yaml
 columns: [backlog, todo, doing, review, done]
 noStatusColumn: Inbox     # default: "No status"
+types:                    # optional: type → color, see Type colors
+  incident: orange
 ```
 
 ## UI (v1)
@@ -155,6 +159,37 @@ Drag a column by its header (⠿ grip) and drop it on either half of another col
 - Every color, font, radius, border and shadow is a CSS custom property on `:root`. No hard-coded colors in components.
 - A theme = one CSS file, activated by `<html data-theme="…">`. Themes may override any rule, not just variables (so a hand-drawn theme can change fonts, borders, rotation, filters).
 - v1 ships **light** and **dark**. Default follows the OS (`prefers-color-scheme`). Header toggle: System → Light → Dark; a manual choice is saved in `localStorage`.
+
+### Type colors
+
+Cards are color-coded by `type`: a 4px stripe on the left edge plus a tinted type chip. The type is always shown as text too, and there is no legend.
+
+- Palette (names, not hex): `red, orange, yellow, green, teal, blue, purple, pink, grey`. Each theme defines its own shade as `--type-<name>`, so colors fit light/dark (and future themes). Red and green also differ in lightness.
+- Built-in defaults (no config needed):
+
+  | Color | Types |
+  |---|---|
+  | red | bug, defect, incident |
+  | orange | epic |
+  | yellow | spike, research |
+  | green | feature, story |
+  | blue | improvement, enhancement |
+  | teal | docs, documentation |
+  | purple | design |
+  | grey | task, chore |
+
+- Any other type: uncolored chip. No type: no stripe.
+- Override or extend in `.markanban.yml`; config wins over the built-in list:
+
+  ```yaml
+  types:
+    incident: orange
+    ops: pink
+  ```
+
+- Matching ignores case and surrounding spaces; otherwise exact (no plurals, no fuzzy matching).
+- Colors are changed only via config or defaults, never in the UI.
+- An unknown color name skips that entry (falls back to the built-in color, if any) and shows a warning listing the valid colors.
 
 ## Tech
 
