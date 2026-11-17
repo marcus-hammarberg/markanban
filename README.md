@@ -9,7 +9,7 @@ Your cards stay plain markdown files. Edit them in the board, in your editor, or
 You need [Node.js](https://nodejs.org) 22.18 or newer.
 
 ```sh
-npx github:<owner>/markanban ./my-board
+npx github:marcus-hammarberg/markanban ./my-board
 ```
 
 This opens the board in your browser at <http://localhost:4242>. Leave out the folder to use the current one. The first run takes a little longer while it downloads and builds.

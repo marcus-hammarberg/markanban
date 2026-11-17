@@ -23,7 +23,7 @@ Markanban is a kanban board driven by a folder of markdown files. `SPEC.md` is t
 ## Gotchas
 
 - Source runs directly on Node ≥ 22.18 (type stripping): relative imports use the `.ts` extension, and only erasable TypeScript is allowed (no enums, namespaces or constructor parameter properties). `tsc` rewrites imports to `.js` for `dist/`.
-- `dist/` is not committed. The `prepare` script builds it, which is what makes `npx github:<owner>/markanban` work.
+- `dist/` is not committed. The `prepare` script builds it, which is what makes `npx github:marcus-hammarberg/markanban` work.
 - `createServer` must close its folder watcher on `server.close()`, otherwise the test process never exits.
 - `fetch()` silently drops a custom `Host` header; use `node:http` to test the Host check.
 - The `h()` helper in `public/app.js` skips only `null`/`false` children, so `0 && …` renders a literal `0`. Use `count > 0 && …`.
