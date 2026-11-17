@@ -6,6 +6,7 @@ const form = $('#card-form');
 
 let board = null;
 let current = null; // card open in the dialog
+let hashSynced = false; // the link in the address bar is opened once, after the first load
 
 // --- helpers ---------------------------------------------------------------
 
@@ -140,6 +141,7 @@ async function load() {
   try {
     board = await api('GET', '/api/board');
     render();
+    if (!hashSynced) { hashSynced = true; syncFromHash(); }
   } catch (e) {
     showError(`Could not load board: ${e.message}`);
   }
@@ -375,7 +377,18 @@ function render() {
 
 // --- card dialog -----------------------------------------------------------
 
+// The address bar follows the dialog (#card=<file name>): opening a card sets the hash, and the
+// hashchange handler below does the showing, so clicks, Back/Forward and pasted links share one path.
+const cardHash = (name) => `#card=${encodeURIComponent(name)}`;
+const hashedCard = () => new URLSearchParams(location.hash.slice(1)).get('card');
+const clearHash = () => { if (location.hash) history.replaceState(null, '', location.pathname + location.search); };
+
 function openCard(card) {
+  if (hashedCard() === card.name) showCard(card);
+  else location.hash = cardHash(card.name);
+}
+
+function showCard(card) {
   current = card;
   form.heading.value = card.heading;
   form.status.value = card.status ?? '';
@@ -390,7 +403,7 @@ function openCard(card) {
   renderLog(card);
   $('#archive').textContent = card.archived ? 'Unarchive' : 'Archive';
   if (card.error) showError(`${card.name}: ${card.error}. Fix it in the file to edit this card.`);
-  dialog.showModal();
+  if (!dialog.open) dialog.showModal();
 }
 
 // Comments, history and dates only, so it can refresh without touching unsaved field edits.
@@ -446,6 +459,7 @@ form.addEventListener('submit', (e) => {
   act(() => api('PATCH', `/api/cards/${encodeURIComponent(card.name)}`, { fields, body })).then((ok) => {
     if (ok) return;
     current = card;
+    history.replaceState(null, '', cardHash(card.name));
     dialog.showModal();
   });
 });
@@ -457,7 +471,35 @@ $('#archive').addEventListener('click', () => {
   act(() => api('PATCH', `/api/cards/${encodeURIComponent(name)}`, { archive }));
 });
 
-dialog.addEventListener('close', () => { current = null; });
+dialog.addEventListener('close', () => { current = null; clearHash(); });
+
+// Show the card the hash names (archived or filtered-out cards included), or close the dialog if none.
+function syncFromHash() {
+  if (!board) return; // load() calls this once the first board has arrived
+  const name = hashedCard();
+  if (!name) { if (dialog.open) dialog.close(); return; }
+  if (current?.name === name) return;
+  const card = board.cards.find((c) => c.name === name);
+  if (card) { showError(''); return showCard(card); }
+  showError(`No card ${name}`);
+  clearHash();
+}
+addEventListener('hashchange', syncFromHash);
+
+let copyTimer;
+$('#copy-link').addEventListener('click', async (e) => {
+  if (!current) return;
+  const url = location.origin + location.pathname + cardHash(current.name);
+  const btn = e.currentTarget;
+  try {
+    await navigator.clipboard.writeText(url);
+    btn.textContent = '✓ Copied';
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => { btn.textContent = '🔗'; }, 1500);
+  } catch {
+    showError(`Could not copy. The link is ${url}`);
+  }
+});
 
 // --- live updates ----------------------------------------------------------
 

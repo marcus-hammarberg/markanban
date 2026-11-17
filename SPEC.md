@@ -122,6 +122,7 @@ Actions:
 - Archive / unarchive
 - "Show archived" toggle (archived cards greyed out; they never create columns)
 - History view per card
+- Link to a card: 🔗 in the card dialog copies its link (see Card links)
 - Ctrl/⌘+Enter in the card dialog saves the card (in the comment box it adds the comment instead)
 
 **No delete** in v1. Remove the file yourself.
@@ -148,6 +149,20 @@ Checked in staging.
 - Headings (`#`–`###`) inside a comment are demoted to `####` so they can't end the comment or section.
 - Add-only in the UI; edit or delete by editing the file. Each add logs `comment: added` in the changelog.
 - Hidden from the body textarea; shown as a list with an "Add comment" box (⌘/Ctrl+Enter submits). Cards show a 💬 count. Search includes comment text.
+
+### Card links
+
+Every card has a link, so it can be pasted into chat, a ticket or a note. Client-side only: no server or API change.
+
+- Format: `http://localhost:<port>/#card=<file name>`, name URL-encoded (`#card=fix-login-bug.md`). The file name never changes, so the link is stable. The host and port are the sender's own; a team that shares a board should agree on a port.
+- The address bar follows the dialog: opening a card (click, Enter or link) sets the hash, closing it clears the hash. Back/Forward therefore open and close cards.
+- Arriving on a link opens the card once the board has loaded, and again on every hash change.
+- Archived cards open even when "Show archived" is off; filters never affect the dialog.
+- A link to a card that doesn't exist shows "No card <name>" in the error banner and clears the hash. It is checked on load and on hash change, not on live updates, so the dialog can't reopen after being closed.
+- Changing the link while the dialog is open switches cards without asking, like Esc, which also drops unsaved edits.
+- The 🔗 button sits in the dialog header, left of ✕, and copies the full URL. It shows "✓ Copied" for about 1.5 s. If the clipboard is refused, the link is shown in the error banner instead. Board cards carry no link icon.
+- A failed save reopens the dialog with the typed values and restores the hash.
+- Not in v1: links between cards, port-independent links.
 
 ### Filters
 
