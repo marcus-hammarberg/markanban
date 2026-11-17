@@ -220,3 +220,29 @@ test('rank changes rewrite only the front-matter and are never logged', () => {
   assert.match(moved, /status: todo → doing\n$/);
   assert.doesNotMatch(moved, /rank: .* → /);
 });
+
+test('a heading with $ replacement patterns is written literally', () => {
+  const out = applyChange('# Old\n\nbody\n', { fields: { heading: 'Cost $& more $1 $$' } }, 'me', NOW);
+  assert.equal(out.split('\n')[0], '# Cost $& more $1 $$');
+});
+
+test('headings with line breaks are refused (they could forge sections)', () => {
+  assert.throws(() => applyChange('# Old\n', { fields: { heading: 'x\n## Changelog' } }, 'me', NOW), /single line/);
+  assert.throws(() => newCard('x\n## Changelog', null, 'me', NOW), /single line/);
+});
+
+test('first write to a card without `created` stamps the birthtime; no-op writes stay no-ops', () => {
+  const created = '2026-01-01T00:00:00Z';
+  const out = applyChange('just text\n', { fields: { status: 'todo' }, created }, 'me', NOW);
+  assert.equal(parseCard(out, { ...meta, created: 'X' }).created, created);
+  assert.equal(applyChange('just text\n', { created }, 'me', NOW), 'just text\n');
+  // An existing `created` is never overwritten.
+  const has = '---\ncreated: 2025-05-05T00:00:00Z\n---\nx\n';
+  assert.equal(parseCard(applyChange(has, { fields: { status: 'a' }, created }, 'me', NOW), meta).created, '2025-05-05T00:00:00Z');
+  // Rank-only writes stamp too, so a reorder can't reset the date either.
+  assert.match(applyChange('just text\n', { rank: 1000, created }, 'me', NOW), /created: 2026-01-01T00:00:00Z/);
+});
+
+test('a whitespace-only status counts as no status', () => {
+  assert.equal(parseCard('---\nstatus: "  "\n---\nx', meta).status, null);
+});

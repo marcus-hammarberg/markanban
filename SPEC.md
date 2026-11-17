@@ -1,3 +1,7 @@
+---
+rank: 1000
+created: 2026-11-17T08:14:24Z
+---
 # Markanban — v1 Spec
 
 A kanban board driven by a folder of markdown files. Point it at a folder and you're done.
@@ -54,7 +58,7 @@ Users get logged out after 5 minutes.
 | `type` | Free text. |
 | `assignee` | Free text. |
 | `tags` | Comma string (`ui, auth`) or YAML list (`[ui, auth]`). Read both; write back in the form already used; new cards use comma string. |
-| `created` | ISO UTC timestamp. Written only when the card is created via the UI. Missing → display file birthtime (never written back). |
+| `created` | ISO UTC timestamp. Written when the card is created via the UI. Missing → display file birthtime; the first write Markanban makes to such a card (edit, move or reorder) stamps that birthtime here, because the atomic write replaces the file and would reset it. Never logged. |
 | `archived` | ISO UTC timestamp. Present = archived, absent = active. |
 | `rank` | Number: the card's position in its column (lower = higher up = more important). Managed by the board, hidden on the card, never logged. See Card order. |
 
@@ -65,6 +69,7 @@ Users get logged out after 5 minutes.
 
 - Filename = slug of the heading (`Fix login bug` → `fix-login-bug.md`), `-2`, `-3`… on collision.
 - Filename never changes afterwards, even if the heading does.
+- A heading is a single line; the API refuses line breaks (they could forge `## Changelog`).
 - Heading is written as a `# H1` in the body (not front-matter). `created` is set, and the changelog starts with `card: created`.
 
 ## Changelog
@@ -126,6 +131,7 @@ Actions:
 Stored in the card file as a `## Comments` section between the body and `## Changelog`:
 
 ```markdown
+
 ## Comments
 
 ### 2026-11-17T09:12:00Z marcus
@@ -154,6 +160,7 @@ Drag a column by its header (⠿ grip) and drop it on either half of another col
 ### Live updates & safe writes
 
 - Server watches the folder (`fs.watch`) and pushes changes to the browser via Server-Sent Events.
+- A card file that can't be read (permissions, etc.) is left out of the board with a warning; it never fails the whole board. A file that vanishes mid-listing is skipped silently.
 - Every write re-reads the file from disk and applies only the targeted change (one field, or append one changelog line). Never write back a stale full copy.
 
 ### Theming
@@ -262,3 +269,6 @@ A separate, read-only mode that plays back how cards moved across the board over
 
 **Known gap (accepted)**
 - Edits made outside the UI aren't in the changelog, so such a card jumps to its current column at the end. Replay is only as complete as the changelog.
+- 2026-11-17T13:41:26Z marcushammarberg status: (none) → Demo
+- 2026-11-17T13:41:34Z marcushammarberg status: Demo → Done
+- 2026-11-17T13:41:35Z marcushammarberg status: Done → (none)

@@ -25,14 +25,23 @@ export function createStorage(root: string) {
   return {
     dir,
 
-    async list(): Promise<StoredFile[]> {
+    /** One unreadable file never fails the listing: it is reported in `unreadable` instead. */
+    async list(): Promise<{ files: StoredFile[]; unreadable: { name: string; message: string }[] }> {
       const entries = await readdir(dir, { withFileTypes: true });
-      const files = entries.filter((e) => e.isFile() && isCardName(e.name));
-      return Promise.all(files.map(async (e) => {
-        const full = path.join(dir, e.name);
-        const [text, st] = await Promise.all([readFile(full, 'utf8'), stat(full)]);
-        return { name: e.name, text, created: st.birthtime.toISOString(), mtime: st.mtime.toISOString() };
+      const names = entries.filter((e) => e.isFile() && isCardName(e.name)).map((e) => e.name);
+      const files: StoredFile[] = [];
+      const unreadable: { name: string; message: string }[] = [];
+      await Promise.all(names.map(async (name) => {
+        const full = path.join(dir, name);
+        try {
+          const [text, st] = await Promise.all([readFile(full, 'utf8'), stat(full)]);
+          files.push({ name, text, created: st.birthtime.toISOString(), mtime: st.mtime.toISOString() });
+        } catch (e) {
+          // Vanished between readdir and read (sync tool, editor save): not worth a warning.
+          if ((e as NodeJS.ErrnoException).code !== 'ENOENT') unreadable.push({ name, message: (e as Error).message });
+        }
       }));
+      return { files, unreadable };
     },
 
     async read(name: string): Promise<string | null> {

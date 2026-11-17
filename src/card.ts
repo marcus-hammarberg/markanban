@@ -34,6 +34,7 @@ export interface Change {
   archive?: boolean;
   comment?: string;
   rank?: number; // board housekeeping: written to front-matter, never logged
+  created?: string; // the file's birthtime, stamped on the first write if the card has no `created`
 }
 
 // File layout: [front-matter] body [## Comments] [## Changelog] — the last two are optional.
@@ -121,7 +122,7 @@ export function parseCard(raw: string, meta: FileMeta): Card {
   return {
     name: meta.name,
     heading: str(data.heading) ?? h1(p.body) ?? fileHeading(meta.name),
-    status: str(data.status),
+    status: str(data.status)?.trim() || null,
     type: str(data.type),
     assignee: str(data.assignee),
     tags: toTags(data.tags),
@@ -146,6 +147,9 @@ const fmt = (v: unknown) => {
 // Our own section and comment headings get a blank line after them (markdownlint MD022).
 // Also upgrades files written before this rule. Never applied to the user's body.
 const spaceHeadings = (s: string) => s.replace(/^(#{2,3} .*)\n(?!\n)/gm, '$1\n\n');
+
+// A heading is one line; a line break would let it inject headings such as `## Changelog`.
+const checkHeading = (h: string) => { if (/[\r\n]/.test(h)) throw new Error('Heading must be a single line'); };
 
 const normBody = (b: string) => b.replace(/\r\n/g, '\n').trimEnd();
 
@@ -173,12 +177,13 @@ export function applyChange(raw: string, change: Change, who: string, now: strin
     const value = rawValue == null ? null : rawValue.trim() || null;
 
     if (key === 'heading') {
+      if (value !== null) checkHeading(value);
       const old = str(data.heading) ?? h1(p.body);
       if (value === old || value === null) {
         if (value === null && doc.has('heading')) { record(key, data.heading, null); setKey(doc, key, null); }
         continue;
       }
-      if (!doc.has('heading') && h1(p.body) !== null) p.body = p.body.replace(/^# +.+$/m, `# ${value}`);
+      if (!doc.has('heading') && h1(p.body) !== null) p.body = p.body.replace(/^# +.+$/m, () => `# ${value}`);
       else setKey(doc, key, value);
       record(key, old, value);
       continue;
@@ -218,6 +223,8 @@ export function applyChange(raw: string, change: Change, who: string, now: strin
   if (change.rank !== undefined && data.rank !== change.rank) setKey(doc, 'rank', change.rank);
 
   if (!log.length && !docChanged) return raw;
+  // The atomic write replaces the file, which resets its birthtime. Keep the date in the file instead.
+  if (change.created && !data.created) setKey(doc, 'created', change.created);
 
   let head = p.head;
   if (docChanged) {
@@ -242,6 +249,7 @@ export function slug(heading: string): string {
 }
 
 export function newCard(heading: string, status: string | null, who: string, now: string): string {
+  checkHeading(heading);
   const doc = parseDocument('');
   if (status) doc.set('status', status);
   doc.set('created', now);

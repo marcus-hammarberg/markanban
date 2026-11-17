@@ -17,11 +17,17 @@ const { values, positionals } = parseArgs({
 });
 
 if (values.help) {
-  console.log(`Usage: markanban [folder] [--port 4242] [--user name] [--no-open]
+  console.log(`Usage: markanban [folder] [--port 4242] [--user name] [--no-open] [-h|--help]
 
   folder      Folder of markdown cards, created if missing (default: current folder)
   --user      Name written in changelogs (default: $MARKANBAN_USER, then OS user)`);
   process.exit(0);
+}
+
+const port = Number(values.port);
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  console.error(`Invalid --port: ${values.port} (use a number from 1 to 65535)`);
+  process.exit(1);
 }
 
 const folder = positionals[0] ?? '.';
@@ -44,7 +50,6 @@ const osUser = () => { try { return os.userInfo().username; } catch { return 'un
 // One token, so changelog lines stay "<ts> <who> <field>: …".
 const user = (values.user || process.env.MARKANBAN_USER || osUser()).trim().replace(/\s+/g, '_');
 
-const port = Number(values.port);
 const storage = createStorage(folder);
 const server = createServer(storage, user);
 

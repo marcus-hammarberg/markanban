@@ -441,8 +441,13 @@ form.addEventListener('submit', (e) => {
   if (e.submitter?.value !== 'save' || !current) return;
   const { fields, body } = changes();
   if (!Object.keys(fields).length && body === undefined) return;
-  const name = current.name;
-  act(() => api('PATCH', `/api/cards/${encodeURIComponent(name)}`, { fields, body }));
+  const card = current;
+  // The form closes on submit; if the save fails, bring it back with what the user typed.
+  act(() => api('PATCH', `/api/cards/${encodeURIComponent(card.name)}`, { fields, body })).then((ok) => {
+    if (ok) return;
+    current = card;
+    dialog.showModal();
+  });
 });
 
 $('#archive').addEventListener('click', () => {

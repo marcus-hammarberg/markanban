@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, readdir } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, writeFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
@@ -179,8 +179,11 @@ test('card order: the browser says where, the server ranks, sorts and never logs
   // A to the bottom: unranked C above the drop point gets a rank first, without a changelog.
   await patch('a.md', { place: { before: null } });
   assert.deepEqual(await order('todo'), ['d.md', 'b.md', 'c.md', 'a.md']);
-  assert.equal(await file('c.md'), '---\nstatus: todo\nrank: 3000\n---\n# C\n');
-  assert.equal(await file('a.md'), '---\nstatus: todo\nrank: 4000\n---\n# A\n');
+  // (Cards without `created` also get it stamped on their first write, so a reorder can't reset their date.)
+  const bare = async (name: string) => (await file(name)).replace(/^created: .*\n/m, '');
+  assert.equal(await bare('c.md'), '---\nstatus: todo\nrank: 3000\n---\n# C\n');
+  assert.equal(await bare('a.md'), '---\nstatus: todo\nrank: 4000\n---\n# A\n');
+  assert.match(await file('c.md'), /^created: \d{4}-/m);
 
   // The next move fixes a broken rank.
   await patch('e.md', { place: { before: null } });
@@ -192,4 +195,27 @@ test('card order: the browser says where, the server ranks, sorts and never logs
   assert.equal((await patch('b.md', { place: 'top' })).status, 400);
   assert.equal((await patch('b.md', { place: { before: 5 } })).status, 400);
   assert.deepEqual(await order('todo'), ['d.md', 'b.md', 'c.md', 'a.md']);
+});
+
+test('unreadable cards are skipped with a warning; editing keeps the card date', { skip: process.getuid?.() === 0 }, async (t) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'markanban-'));
+  await writeFile(path.join(dir, 'ok.md'), 'fine');
+  await writeFile(path.join(dir, 'locked.md'), 'secret');
+  await chmod(path.join(dir, 'locked.md'), 0o000);
+  t.after(() => chmod(path.join(dir, 'locked.md'), 0o600));
+  const server = createServer(createStorage(dir), 'tester');
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const base = `http://localhost:${(server.address() as AddressInfo).port}`;
+  const json = { 'content-type': 'application/json' };
+
+  let board = await (await fetch(base + '/api/board')).json();
+  assert.deepEqual(board.cards.map((c: { name: string }) => c.name), ['ok.md']);
+  assert.match(board.warnings.join('\n'), /locked\.md.*could not be read/);
+
+  const before = board.cards[0].created;
+  await fetch(base + '/api/cards/ok.md', { method: 'PATCH', headers: json, body: JSON.stringify({ fields: { status: 'todo' } }) });
+  board = await (await fetch(base + '/api/board')).json();
+  assert.equal(board.cards[0].created, before.replace(/\.\d+Z$/, 'Z'));
+  assert.match(await readFile(path.join(dir, 'ok.md'), 'utf8'), /created: /);
 });

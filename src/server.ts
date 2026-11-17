@@ -47,7 +47,8 @@ export function createServer(storage: Storage, user: string) {
   async function board() {
     const config = parseConfig((await storage.read(CONFIG_FILE)) ?? '');
     // All board rules are decided here; the browser only displays the result.
-    const cards = (await storage.list()).map((f) => {
+    const { files, unreadable } = await storage.list();
+    const cards = files.map((f) => {
       const card = parseCard(f.text, f);
       return { ...card, color: typeColor(card.type, config.types) };
     }).sort(rankOrder); // within each column: priority order, top first
@@ -56,6 +57,7 @@ export function createServer(storage: Storage, user: string) {
       .map((s) => ({ key: s as string | null, label: s }));
     if (active.some((c) => !c.status)) columns.unshift({ key: null, label: config.noStatusColumn });
     const { warnings, ...settings } = config;
+    warnings.push(...unreadable.map((u) => `${u.name} could not be read and is not shown (${u.message})`));
     return { folder: path.basename(storage.dir), user, config: settings, warnings, columns, cards };
   }
 
@@ -63,6 +65,7 @@ export function createServer(storage: Storage, user: string) {
     const heading = optString(body.heading, 'heading')?.trim();
     if (!heading) throw new HttpError(400, 'heading is required');
     const status = optString(body.status, 'status')?.trim() || null;
+    if (/[\r\n]/.test(heading)) throw new HttpError(400, 'Heading must be a single line');
     const base = slug(heading);
     for (let i = 1; i < 1000; i++) {
       const name = `${base}${i > 1 ? `-${i}` : ''}.md`;
@@ -74,6 +77,16 @@ export function createServer(storage: Storage, user: string) {
       }
     }
     throw new HttpError(409, 'Could not find a free file name');
+  }
+
+  // Applies a change to a card's text. A card without `created` gets its birthtime stamped
+  // (see Change.created), so the atomic write can't reset the date it shows.
+  async function applyTo(name: string, raw: string, change: Change) {
+    if (parseCard(raw, { name, created: '', mtime: '' }).created === '') {
+      const file = (await storage.list()).files.find((f) => f.name === name);
+      if (file) change = { ...change, created: file.created.replace(/\.\d+Z$/, 'Z') };
+    }
+    return applyChange(raw, change, user, now());
   }
 
   async function updateCard(name: string, body: Record<string, unknown>) {
@@ -114,7 +127,7 @@ export function createServer(storage: Storage, user: string) {
     if (raw === null) throw new HttpError(404, `No card ${name}`);
     let next: string;
     try {
-      next = applyChange(raw, change, user, now());
+      next = await applyTo(name, raw, change);
     } catch (e) {
       throw new HttpError(400, (e as Error).message);
     }
@@ -123,7 +136,7 @@ export function createServer(storage: Storage, user: string) {
     for (const u of rankUpdates) {
       const text = await storage.read(u.name);
       if (text === null) continue;
-      const ranked = applyChange(text, { rank: u.rank }, user, now());
+      const ranked = await applyTo(u.name, text, { rank: u.rank });
       if (ranked !== text) await storage.write(u.name, ranked);
     }
     if (next !== raw) await storage.write(name, next);

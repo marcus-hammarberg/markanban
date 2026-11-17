@@ -116,7 +116,7 @@ Other types have no color until you add them to `.markanban.yml` (below).
 
 ## Settings: `.markanban.yml`
 
-Optional. It lives in the board folder and is created for you the first time you reorder columns.
+Optional. It lives in the board folder and is created for you the first time you reorder columns, add a column, or empty one by moving or archiving its last card.
 
 ```yaml
 columns: [backlog, todo, doing, review, done]   # column order
@@ -147,6 +147,7 @@ Markanban only accepts connections from your own computer; it isn't reachable fr
 - Swimlanes, attachments and a hosted version aren't there yet.
 - Card text and comments are shown as plain text; markdown isn't rendered yet.
 - Changes made outside the board (in an editor or by sync) aren't recorded in the history.
+- A card file Markanban can't read (for example, no permission) is left out and a warning names it.
 
 ## Contributing
 
