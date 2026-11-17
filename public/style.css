@@ -1,0 +1,97 @@
+/* Light theme = the defaults. Components only use these tokens, never raw colors,
+   so a theme file only needs to redefine them (and may override any rule it likes). */
+:root {
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --column-bg: #eceef2;
+  --text: #1d2129;
+  --muted: #6b7280;
+  --border: #d9dce3;
+  --border-strong: #b4b9c4;
+  --accent: #3b6cf6;
+  --accent-text: #ffffff;
+  --chip-bg: #e8ecf7;
+  --chip-text: #34406b;
+  --warn: #b45309;
+  --danger: #c0392b;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  --shadow-lift: 0 6px 16px rgb(0 0 0 / 0.12);
+  --radius: 8px;
+  --radius-sm: 4px;
+  --gap: 12px;
+  --column-width: 280px;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; }
+button, input, textarea { font: inherit; color: inherit; }
+
+.topbar { display: flex; align-items: center; gap: var(--gap); padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.topbar h1 { font-size: 16px; margin: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar .toggle { flex-direction: row; font-size: 14px; display: flex; gap: 6px; align-items: center; color: var(--muted); cursor: pointer; }
+
+/* Secondary (default): bordered and full-contrast text, so it clearly reads as a button. */
+button { cursor: pointer; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); padding: 4px 12px; }
+button:hover { background: var(--column-bg); border-color: var(--muted); }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button.primary:hover { filter: brightness(1.08); }
+/* Icon-only buttons (+, ‹ ›, ✕): no chrome until hovered, to keep headers quiet. */
+button.icon { border-color: transparent; background: transparent; color: var(--text); padding: 2px 8px; font-size: 16px; line-height: 1; }
+button.icon:hover { background: var(--surface); border-color: var(--border-strong); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.filters input, .filters select { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px; background: var(--bg); color: var(--text); }
+.filters input { flex: 0 1 240px; min-width: 120px; }
+.filters .active { border-color: var(--accent); }
+
+.error { background: var(--danger); color: var(--accent-text); padding: 8px 16px; }
+
+.board { display: flex; gap: var(--gap); padding: 16px; overflow-x: auto; align-items: flex-start; min-height: calc(100vh - 56px); }
+.column { flex: 0 0 var(--column-width); background: var(--column-bg); border-radius: var(--radius); padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.column.over { outline: 2px dashed var(--accent); }
+.column.archived { opacity: 0.6; }
+.column.dragging { opacity: 0.4; }
+.column.drop-before { box-shadow: -4px 0 0 var(--accent); }
+.column.drop-after { box-shadow: 4px 0 0 var(--accent); }
+.column-head .grip { color: var(--muted); cursor: grab; font-size: 12px; }
+.column-head .move { display: flex; opacity: 0; }
+.column-head:hover .move, .column-head:focus-within .move { opacity: 1; }
+.column-head .move button { padding: 0 6px; }
+.column-head button:disabled { visibility: hidden; }
+.column-head { display: flex; align-items: center; gap: 6px; padding: 2px 4px; font-weight: 600; }
+.column-head[draggable="true"] { cursor: grab; }
+.column-head .count { color: var(--muted); font-weight: 400; }
+.column-head .title { flex: 1; }
+.column-head.no-status .title { font-style: italic; color: var(--muted); }
+.new-column { background: transparent; border: 2px dashed var(--border); color: var(--muted); min-height: 80px; justify-content: center; align-items: center; cursor: pointer; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; box-shadow: var(--shadow); cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.card:hover { box-shadow: var(--shadow-lift); }
+.card.dragging { opacity: 0.4; }
+.card .heading { font-weight: 600; overflow-wrap: anywhere; }
+.card .meta { color: var(--muted); font-size: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+.card .warn { color: var(--warn); font-size: 12px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { background: var(--chip-bg); color: var(--chip-text); border-radius: 999px; padding: 1px 8px; font-size: 12px; }
+.chip.extra { background: transparent; border: 1px solid var(--border); color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+
+dialog { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); width: min(720px, calc(100vw - 32px)); padding: 0; box-shadow: var(--shadow-lift); }
+dialog::backdrop { background: rgb(0 0 0 / 0.35); }
+#card-form { display: flex; flex-direction: column; gap: var(--gap); padding: 16px; }
+.dialog-head { display: flex; gap: 8px; }
+.heading-input { flex: 1; font-size: 18px; font-weight: 600; border: 1px solid transparent; border-radius: var(--radius-sm); padding: 4px 6px; background: transparent; }
+.heading-input:hover, .heading-input:focus { border-color: var(--border); }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
+label input, label textarea { color: var(--text); font-size: 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 8px; background: var(--bg); }
+.toggle input { margin: 0; }
+textarea { font-family: var(--font-mono); resize: vertical; }
+.history { font-family: var(--font-mono); font-size: 12px; color: var(--muted); padding-left: 18px; }
+summary { cursor: pointer; color: var(--muted); }
+.dialog-foot { display: flex; align-items: center; gap: 8px; }
+.dialog-foot .muted { flex: 1; color: var(--muted); font-size: 12px; text-align: right; }

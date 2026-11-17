@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Markanban</title>
+  <script>
+    // Apply theme before first paint to avoid a flash. Same logic as setTheme() in app.js.
+    try {
+      const mode = localStorage.getItem('markanban-theme') || 'system';
+      document.documentElement.dataset.theme = mode === 'system'
+        ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : mode;
+    } catch { document.documentElement.dataset.theme = 'light'; }
+  </script>
+  <link rel="stylesheet" href="style.css">
+  <!-- Themes: each file overrides tokens (and anything else) under :root[data-theme="…"] -->
+  <link rel="stylesheet" href="themes/dark.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 id="title">Markanban</h1>
+    <label class="toggle"><input type="checkbox" id="show-archived"> Show archived</label>
+    <button id="theme" title="Theme"></button>
+  </header>
+  <div class="filters" id="filters">
+    <input type="search" id="filter-q" placeholder="Search…" aria-label="Search heading and body">
+    <select id="filter-type" aria-label="Filter by type"></select>
+    <select id="filter-assignee" aria-label="Filter by assignee"></select>
+    <select id="filter-tag" aria-label="Filter by tag"></select>
+    <button id="filter-clear" hidden>Clear</button>
+  </div>
+  <div id="error" class="error" hidden></div>
+  <main id="board" class="board"></main>
+
+  <dialog id="card-dialog">
+    <form id="card-form" method="dialog">
+      <header class="dialog-head">
+        <input name="heading" class="heading-input" aria-label="Heading" required>
+        <button value="close" class="icon" aria-label="Close" formnovalidate>✕</button>
+      </header>
+      <div class="fields">
+        <label>Status <input name="status" list="status-list"></label>
+        <label>Type <input name="type"></label>
+        <label>Assignee <input name="assignee"></label>
+        <label>Tags <input name="tags" placeholder="comma, separated"></label>
+      </div>
+      <div id="extra" class="chips"></div>
+      <label class="body-label">Body <textarea name="body" rows="12"></textarea></label>
+      <details>
+        <summary>History</summary>
+        <ul id="history" class="history"></ul>
+      </details>
+      <footer class="dialog-foot">
+        <button type="button" id="archive"></button>
+        <span class="muted" id="dates"></span>
+        <button value="save" class="primary">Save</button>
+      </footer>
+    </form>
+  </dialog>
+  <datalist id="status-list"></datalist>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

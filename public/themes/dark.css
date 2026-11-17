@@ -1,0 +1,18 @@
+:root[data-theme="dark"] {
+  --bg: #15171c;
+  --surface: #1f2229;
+  --column-bg: #191c22;
+  --text: #e6e8ee;
+  --muted: #9aa1b0;
+  --border: #323743;
+  --border-strong: #4c5364;
+  --accent: #6b8cff;
+  --accent-text: #0d1020;
+  --chip-bg: #2a3150;
+  --chip-text: #c9d3ff;
+  --warn: #f0a24b;
+  --danger: #e2574c;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-lift: 0 6px 16px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
