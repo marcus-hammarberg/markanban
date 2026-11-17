@@ -91,13 +91,13 @@ Order:
 2. then the common order: `backlog, todo, ready, doing, in progress, review, done` (case-insensitive)
 3. then the remaining statuses alphabetically
 
-- Empty columns disappear unless listed in `.markanban.yml`.
+- A column emptied by a board action (moving or archiving its last card) stays: the server saves the current column order to `.markanban.yml` first. Columns known only from card statuses, emptied by an outside edit, still disappear unless listed in `.markanban.yml`.
 - The user can reorder columns by drag → writes `.markanban.yml`.
 - A "+ column" input allows moving a card to a new status.
 
 ### `.markanban.yml`
 
-Lives in the board folder. Created lazily on first column reorder.
+Lives in the board folder. Created lazily: on the first column reorder or added column, or when a board action would otherwise make a column disappear.
 
 ```yaml
 columns: [backlog, todo, doing, review, done]

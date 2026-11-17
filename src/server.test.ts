@@ -118,3 +118,32 @@ test('static UI files are served, nothing outside public/ is, and bad JSON is re
   assert.equal(await readFile(path.join(dir, 'card.md'), 'utf8'), '---\nstatus: todo\n---\n# Card\n');
   assert.deepEqual(await readdir(dir), ['card.md']);
 });
+
+test('a column emptied from the board stays (saved to .markanban.yml); others stay zero-config', async (t) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'markanban-'));
+  // Columns known only from card statuses (cards written by hand, no config file).
+  await writeFile(path.join(dir, 'a.md'), '---\nstatus: Todo\n---\n# A\n');
+  await writeFile(path.join(dir, 'b.md'), '---\nstatus: Todo\n---\n# B\n');
+  await writeFile(path.join(dir, 'c.md'), '---\nstatus: Review\n---\n# C\n');
+  const server = createServer(createStorage(dir), 'tester');
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const base = `http://localhost:${(server.address() as AddressInfo).port}`;
+  const patch = (name: string, body: unknown) =>
+    fetch(`${base}/api/cards/${name}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const columns = async () => (await (await fetch(`${base}/api/board`)).json()).columns.map((c: { key: string | null }) => c.key);
+  const config = () => readFile(path.join(dir, '.markanban.yml'), 'utf8').catch(() => null);
+
+  // Todo still has B: nothing would disappear, so no config file is created.
+  await patch('a.md', { fields: { status: 'Doing' } });
+  assert.equal(await config(), null);
+
+  // Moving the last card out of Todo keeps Todo, in place and empty.
+  await patch('b.md', { fields: { status: 'Doing' } });
+  assert.deepEqual(await columns(), ['Todo', 'Doing', 'Review']);
+  assert.match(String(await config()), /columns: \[ Todo, Doing, Review \]/);
+
+  // Archiving the last card in a column keeps it too.
+  await patch('c.md', { archive: true });
+  assert.deepEqual(await columns(), ['Todo', 'Doing', 'Review']);
+});

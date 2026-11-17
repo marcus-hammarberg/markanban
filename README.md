@@ -64,7 +64,7 @@ Any other field (like `priority` above) is kept as-is and shown as a small label
 
 Columns come from the statuses on your cards, so a new status gives you a new column. They're ordered the way you'd expect (`backlog`, `todo`, `ready`, `doing`, `in progress`, `review`, `done`), with any others after them alphabetically.
 
-To change the order, drag a column by its header (⠿), or hover over the header and use the ‹ › buttons. Your order is saved in `.markanban.yml`, and columns listed there stay visible even when they're empty. Use **+ Column** to add a new one.
+To change the order, drag a column by its header (⠿), or hover over the header and use the ‹ › buttons. Your order is saved in `.markanban.yml`, and columns listed there stay visible even when they're empty. A column also stays when you move or archive its last card on the board. Use **+ Column** to add a new one, or drop a card on it to give the card a new status.
 
 ## Working with cards
 

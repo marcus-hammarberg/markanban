@@ -97,8 +97,27 @@ export function createServer(storage: Storage, user: string) {
     } catch (e) {
       throw new HttpError(400, (e as Error).message);
     }
-    if (next !== raw) await storage.write(name, next);
+    if (next === raw) return { name };
+    const before = await statusColumns();
+    await storage.write(name, next);
+    await keepColumns(before);
     return { name };
+  }
+
+  const statusColumns = async () => (await board()).columns.flatMap((c) => (c.key === null ? [] : [c.key]));
+
+  // A column you can see doesn't vanish because a board action emptied it: if one would,
+  // save the column order (before the action, plus any new columns) to .markanban.yml.
+  // Boards where nothing disappears stay zero-config.
+  async function keepColumns(before: string[]) {
+    const after = await statusColumns();
+    if (before.every((c) => after.includes(c))) return;
+    const text = (await storage.read(CONFIG_FILE)) ?? '';
+    try {
+      await storage.write(CONFIG_FILE, setConfigColumns(text, [...before, ...after.filter((c) => !before.includes(c))]));
+    } catch {
+      // Unparseable config: leave it alone. The board already shows a warning about it.
+    }
   }
 
   async function saveColumns(body: Record<string, unknown>) {
