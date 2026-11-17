@@ -37,6 +37,7 @@ priority: high
 Users get logged out after 5 minutes.
 
 ## Changelog
+
 - 2026-11-16T14:03:12Z marcus status: todo → doing
 - 2026-11-16T15:20:00Z marcus assignee: (none) → marcus
 - 2026-11-16T15:22:41Z marcus body: edited
@@ -65,7 +66,7 @@ Users get logged out after 5 minutes.
 
 ## Changelog
 
-The last section of the file, `## Changelog`, is a list. Newest last, append-only.
+The last section of the file, `## Changelog`, is a list. Newest last, append-only. Markanban-written headings (`## Comments`, `### <comment>`, `## Changelog`) always have a blank line after them (markdownlint MD022); older files are upgraded on the next write to those sections.
 
 ```
 - <ISO 8601 UTC timestamp> <who> <field>: <from> → <to>
@@ -120,11 +121,14 @@ Stored in the card file as a `## Comments` section between the body and `## Chan
 
 ```markdown
 ## Comments
+
 ### 2026-11-17T09:12:00Z marcus
+
 Session timeout is 5 minutes.
 Checked in staging.
 
 ## Changelog
+
 - 2026-11-17T09:12:00Z marcus comment: added
 ```
 
@@ -160,6 +164,10 @@ Drag a column by its header (⠿ grip) and drop it on either half of another col
 - Storage module with exactly four operations: `list`, `read`, `write`, `watch`. No other abstraction.
 - Security: bind to `127.0.0.1` only. All file paths resolved and verified to be inside the board folder (no `../` escape).
 - Preserve line endings (CRLF on Windows). macOS primary; Linux/Windows should work via Node.
+
+## Known edge cases
+
+- **User headings named like our sections.** Sections are found by the last `## Changelog` and the last `## Comments` before it, and headings inside comments are demoted to `####`, so comments can't break sections. But if a card body uses `## Comments` or `## Changelog` as its own heading and the card has no such section yet, Markanban reads that text as its section. Impact: a misread card, never data loss (the body is never rewritten by section logic). `---` dividers would not help (ambiguous with thematic breaks, setext headings and front-matter). If this shows up in practice: write an invisible marker such as `<!-- markanban:comments -->` above our headings and upgrade existing files on write.
 
 ## Deferred (not v1)
 

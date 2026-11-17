@@ -132,6 +132,10 @@ const fmt = (v: unknown) => {
   return s == null || s === '' ? '(none)' : s.replace(/\s+/g, ' ');
 };
 
+// Our own section and comment headings get a blank line after them (markdownlint MD022).
+// Also upgrades files written before this rule. Never applied to the user's body.
+const spaceHeadings = (s: string) => s.replace(/^(#{2,3} .*)\n(?!\n)/gm, '$1\n\n');
+
 const normBody = (b: string) => b.replace(/\r\n/g, '\n').trimEnd();
 
 /** Apply a UI change to a file's text. Returns the new text (unchanged if nothing changed). */
@@ -196,7 +200,7 @@ export function applyChange(raw: string, change: Change, who: string, now: strin
   if (change.comment !== undefined) {
     const text = commentText(change.comment);
     if (!text) throw new Error('Comment is empty');
-    comments = (comments ? comments.replace(/\s*$/, '\n\n') : '## Comments\n') + `### ${now} ${who}\n${text}\n`;
+    comments = (comments ? comments.replace(/\s*$/, '\n\n') : '## Comments\n') + `### ${now} ${who}\n\n${text}\n`;
     log.push(`- ${now} ${who} comment: added`);
   }
 
@@ -209,8 +213,8 @@ export function applyChange(raw: string, change: Change, who: string, now: strin
   }
   // Sections followed by another section end with a blank line.
   const spaced = (s: string) => (s === '' ? '' : s.replace(/\n*$/, '\n\n'));
-  const tail = (p.log ?? '## Changelog\n').replace(/\n*$/, '\n');
-  const out = head + spaced(p.body) + (comments === null ? '' : spaced(comments)) + tail + log.join('\n') + '\n';
+  const tail = spaceHeadings((p.log ?? '## Changelog\n').replace(/\n*$/, '\n'));
+  const out = head + spaced(p.body) + (comments === null ? '' : spaced(spaceHeadings(comments))) + tail + log.join('\n') + '\n';
   return p.eol === '\n' ? out : out.replace(/\n/g, p.eol);
 }
 
@@ -224,5 +228,5 @@ export function newCard(heading: string, status: string | null, who: string, now
   const doc = parseDocument('');
   if (status) doc.set('status', status);
   doc.set('created', now);
-  return `---\n${String(doc)}---\n# ${heading.trim()}\n\n## Changelog\n- ${now} ${who} card: created\n`;
+  return `---\n${String(doc)}---\n# ${heading.trim()}\n\n## Changelog\n\n- ${now} ${who} card: created\n`;
 }

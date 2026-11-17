@@ -71,7 +71,7 @@ test('no-op change returns file untouched', () => {
 
 test('creates front-matter and changelog section when missing', () => {
   const out = applyChange('# Hi\n', { fields: { status: 'todo' } }, 'm', NOW);
-  assert.equal(out, `---\nstatus: todo\n---\n# Hi\n\n## Changelog\n- ${NOW} m status: (none) → todo\n`);
+  assert.equal(out, `---\nstatus: todo\n---\n# Hi\n\n## Changelog\n\n- ${NOW} m status: (none) → todo\n`);
 });
 
 test('clearing a field removes it and logs (none)', () => {
@@ -133,12 +133,15 @@ priority: high
 Some text.
 
 ## Comments
+
 ### ${NOW} anna
+
 First!
 #### Changelog
 second line
 
 ## Changelog
+
 - 2026-11-01T00:00:00Z anna status: (none) → todo
 - ${NOW} anna comment: added
 `);
@@ -149,11 +152,11 @@ second line
 
   const two = applyChange(out, { comment: 'Second' }, 'marcus', 'T2');
   assert.deepEqual(parseCard(two, meta).comments.map((x) => x.text), ['First!\n#### Changelog\nsecond line', 'Second']);
-  assert.match(two, /second line\n\n### T2 marcus\nSecond\n\n## Changelog/);
+  assert.match(two, /second line\n\n### T2 marcus\n\nSecond\n\n## Changelog\n\n- /);
 });
 
 test('comment on a bare file; empty comment is refused', () => {
-  assert.equal(applyChange('Hi\n', { comment: 'yo' }, 'm', NOW), `Hi\n\n## Comments\n### ${NOW} m\nyo\n\n## Changelog\n- ${NOW} m comment: added\n`);
+  assert.equal(applyChange('Hi\n', { comment: 'yo' }, 'm', NOW), `Hi\n\n## Comments\n\n### ${NOW} m\n\nyo\n\n## Changelog\n\n- ${NOW} m comment: added\n`);
   assert.throws(() => applyChange('Hi\n', { comment: '  ' }, 'm', NOW));
 });
 
@@ -167,7 +170,7 @@ test('body edit keeps existing comments', () => {
 
 test('newCard writes status, created, H1 and a "card: created" changelog line; slug is filename-safe', () => {
   const raw = newCard('Fix: Åsa’s login!', 'todo', 'anna', NOW);
-  assert.equal(raw, `---\nstatus: todo\ncreated: ${NOW}\n---\n# Fix: Åsa’s login!\n\n## Changelog\n- ${NOW} anna card: created\n`);
+  assert.equal(raw, `---\nstatus: todo\ncreated: ${NOW}\n---\n# Fix: Åsa’s login!\n\n## Changelog\n\n- ${NOW} anna card: created\n`);
   const c = parseCard(raw, meta);
   assert.equal(c.heading, 'Fix: Åsa’s login!');
   assert.equal(c.status, 'todo');
@@ -178,4 +181,17 @@ test('newCard writes status, created, H1 and a "card: created" changelog line; s
   assert.match(applyChange(raw, { fields: { status: 'doing' } }, 'm', 'T2'), /card: created\n- T2 m status: todo → doing\n$/);
   assert.equal(slug('Fix: Åsa’s login!'), 'fix-asa-s-login');
   assert.equal(slug('!!!'), 'card');
+});
+
+// MD022: every heading Markanban writes has a blank line after it (and before, unless first).
+const headingsSpaced = (text: string) =>
+  text.split('\n').every((line, i, lines) => !/^#{1,6} /.test(line) || ((i === 0 || lines[i - 1] === '' || lines[i - 1] === '---') && (lines[i + 1] ?? '') === ''));
+
+test('written sections satisfy markdownlint MD022, also when upgrading the old layout', () => {
+  const old = '# Hi\n\n## Comments\n### T0 a\nold\n\n## Changelog\n- T0 a comment: added\n';
+  const out = applyChange(old, { comment: 'new' }, 'm', NOW);
+  assert.ok(headingsSpaced(out.replace(/^# Hi\n/, '')), out);
+  assert.match(out, /## Comments\n\n### T0 a\n\nold\n\n### .+\n\nnew\n\n## Changelog\n\n- T0 a comment: added\n- .+ comment: added\n$/);
+  assert.deepEqual(parseCard(out, meta).comments.map((c) => c.text), ['old', 'new']);
+  assert.ok(headingsSpaced(newCard('X', null, 'm', NOW).replace(/^---[\s\S]*?---\n# X\n/, '')));
 });
