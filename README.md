@@ -73,7 +73,7 @@ To change the order, drag a column by its header (⠿), or hover over the header
 - **Create** a card with the **+** in a column header. It becomes a new file named after its heading.
 - **Edit** by clicking a card: change its fields and text, then **Save** (or press Ctrl/⌘+Enter).
 - **Link** to a card with the 🔗 in its dialog: it copies an address (like `http://localhost:4242/#card=fix-login-bug.md`) that opens the card. Teammates need to use the same port.
-- **Comment** at the bottom of the card. Comments are saved in the card file.
+- **Comment** in the Comments section at the bottom of the card (collapsed until you open it, with the number of comments shown). Comments are saved in the card file.
 - **Archive** cards you're done with. They disappear from the board; tick **Show archived** to see them again and unarchive. There's no delete button: to remove a card for good, delete its file.
 - **Filter** with the row above the board: search text (headings, card text and comments), or pick a type, assignee or tag.
 - **Theme**: the board follows your system's light or dark mode. The button in the top right switches between System, Light and Dark.

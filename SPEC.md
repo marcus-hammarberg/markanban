@@ -148,7 +148,7 @@ Checked in staging.
 - One `### <ISO UTC> <who>` heading per comment, oldest first; text is markdown and may be multi-line.
 - Headings (`#`–`###`) inside a comment are demoted to `####` so they can't end the comment or section.
 - Add-only in the UI; edit or delete by editing the file. Each add logs `comment: added` in the changelog.
-- Hidden from the body textarea; shown as a list with an "Add comment" box (⌘/Ctrl+Enter submits). Cards show a 💬 count. Search includes comment text.
+- Hidden from the body textarea; shown in a "Comments (n)" section that is collapsed by default, like History (both collapse again whenever a card is opened), with a list and an "Add comment" box (⌘/Ctrl+Enter submits). Cards show a 💬 count. Search includes comment text.
 
 ### Card links
 

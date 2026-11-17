@@ -398,6 +398,7 @@ function showCard(card) {
   form.body.value = card.body.trimEnd();
   form.querySelectorAll('input, textarea').forEach((el) => { el.disabled = !!card.error; });
   $('#extra').replaceChildren(...Object.entries(card.extra).map(([k, v]) => h('span', { class: 'chip extra', title: 'Edit in the file' }, `${k}: ${v}`)));
+  $('#comments-section').open = $('#history-section').open = false; // collapsed by default
   $('#new-comment').value = '';
   $('#new-comment').disabled = $('#add-comment').disabled = !!card.error;
   renderLog(card);
@@ -408,6 +409,7 @@ function showCard(card) {
 
 // Comments, history and dates only, so it can refresh without touching unsaved field edits.
 function renderLog(card) {
+  $('#comments-title').textContent = card.comments.length ? `Comments (${card.comments.length})` : 'Comments';
   $('#comments').replaceChildren(...(card.comments.length
     ? card.comments.map((c) => h('li', { class: 'comment' },
       h('div', { class: 'who' }, `${c.who} · ${day(c.at)}`),
