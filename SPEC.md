@@ -175,6 +175,7 @@ Drag a column by its header (⠿ grip) and drop it on either half of another col
 ### Live updates & safe writes
 
 - Server watches the folder (`fs.watch`) and pushes changes to the browser via Server-Sent Events.
+- It also polls every 3 seconds (card and config file names, sizes and mtimes; no contents), because synced folders (Drive for desktop, SMB shares) often fire no file events for remote changes. Always on, no flag. A failed poll (share briefly unreachable) is skipped, never an error.
 - A card file that can't be read (permissions, etc.) is left out of the board with a warning; it never fails the whole board. A file that vanishes mid-listing is skipped silently.
 - Every write re-reads the file from disk and applies only the targeted change (one field, or append one changelog line). Never write back a stale full copy.
 
@@ -232,10 +233,17 @@ Cards are color-coded by `type`: a 4px stripe on the left edge plus a tinted typ
 
 - TypeScript on Node 22+, published as compiled JS (runs via `npx`).
 - Runtime dependency: `yaml` (Document API, preserves comments/order). Dev: `typescript`.
-- Server: `node:http`, `fs.watch`, SSE. Frontend: plain HTML/CSS/JS, native drag & drop, no framework.
+- Server: `node:http`, `fs.watch` + polling, SSE. Frontend: plain HTML/CSS/JS, native drag & drop, no framework.
 - Storage module with exactly four operations: `list`, `read`, `write`, `watch`. No other abstraction.
 - Security: bind to `127.0.0.1` only. All file paths resolved and verified to be inside the board folder (no `../` escape).
 - Preserve line endings (CRLF on Windows). macOS primary; Linux/Windows should work via Node.
+
+## Shared folders
+
+Sharing a board = putting the folder in a sync client's folder (Google Drive for desktop, Dropbox, OneDrive) or on a network share; each person runs Markanban locally. The folder is a CLI path, never a cloud URL; no cloud API, OAuth or extra dependency.
+
+- Other people's changes arrive via the 3-second poll above.
+- Two people editing the same card within the sync delay is resolved by the sync client, not Markanban: some create a conflict copy (shown with ⚠️), Google Drive keeps the newest file and the other version is in Drive's version history. Accepted and documented; no locks.
 
 ## Known edge cases
 
@@ -245,7 +253,6 @@ Cards are color-coded by `type`: a 4px stripe on the left edge plus a tinted typ
 
 - Swimlanes from subfolders
 - Attachments in a folder per card
-- Google Drive / network share storage, plus polling watcher for shares
 - Hosted version
 - Logging external edits
 - LAN access flag

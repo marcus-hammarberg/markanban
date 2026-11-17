@@ -139,7 +139,16 @@ Comments and history use your name. Markanban picks it from, in order:
 
 ## Sharing a board
 
-Put the folder somewhere shared (Google Drive, Dropbox, a network share) and have each person run Markanban on their own computer. Each person's changes are recorded under their own name. If the sync service creates conflict copies (like `card (1).md`), those cards show a ⚠️ so you can sort them out.
+Put the folder in a synced folder (Google Drive for desktop, Dropbox, OneDrive) or on a network share, and have each person run Markanban on their own computer, pointed at their local copy:
+
+```sh
+cd ~/"Library/CloudStorage/GoogleDrive-<you>/My Drive/team-board"
+npx markanban
+```
+
+Each person's changes are recorded under their own name, and other people's changes show up on your board within a few seconds of syncing.
+
+If two people change the same card at almost the same moment, the sync service decides what happens. Dropbox and OneDrive create a conflict copy (like `card (1).md`), which shows a ⚠️ so you can sort it out. Google Drive keeps the newest version; the other one is in the file's version history in Drive.
 
 Markanban only accepts connections from your own computer; it isn't reachable from the network.
 

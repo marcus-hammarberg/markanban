@@ -62,17 +62,48 @@ export function createStorage(root: string) {
       await rename(tmp, full);
     },
 
+    /** fs.watch for instant local updates, plus polling for synced folders that fire no events. */
     watch(onChange: () => void) {
       let timer: NodeJS.Timeout | undefined;
-      // ponytail: fs.watch is unreliable on network shares; add polling when shares are supported.
-      const w = fs.watch(dir, (_event, file) => {
-        if (file && file.startsWith('.') && file !== CONFIG_FILE) return;
+      const changed = () => {
         clearTimeout(timer);
         timer = setTimeout(onChange, 100);
+      };
+      const w = fs.watch(dir, (_event, file) => {
+        if (file && file.startsWith('.') && file !== CONFIG_FILE) return;
+        changed();
       });
-      return () => w.close();
+      const stopPolling = pollFolder(dir, 3000, changed);
+      return () => { w.close(); stopPolling(); clearTimeout(timer); };
     },
   };
+}
+
+/**
+ * Calls onChange when a card or the config file is added, removed, renamed or modified.
+ * Compares name, size and mtime only, so online-only Drive files are not downloaded.
+ */
+export function pollFolder(dir: string, ms: number, onChange: () => void) {
+  let last: string | undefined;
+  let timer: NodeJS.Timeout | undefined;
+  let stopped = false;
+  const tick = async () => {
+    try {
+      const names = (await readdir(dir)).filter((n) => n === CONFIG_FILE || isCardName(n)).sort();
+      const parts = await Promise.all(names.map(async (n) => {
+        const st = await stat(path.join(dir, n)).catch(() => null); // vanished mid-look: next tick sees it
+        return st ? `${n}:${st.size}:${st.mtimeMs}` : '';
+      }));
+      const now = parts.join('\n');
+      if (last !== undefined && now !== last && !stopped) onChange();
+      last = now;
+    } catch {
+      // Share briefly unreachable: keep the last snapshot and try again next tick.
+    }
+    if (!stopped) timer = setTimeout(tick, ms);
+  };
+  tick();
+  return () => { stopped = true; clearTimeout(timer); };
 }
 
 export type Storage = ReturnType<typeof createStorage>;
