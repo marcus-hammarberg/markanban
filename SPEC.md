@@ -173,3 +173,31 @@ Drag a column by its header (⠿ grip) and drop it on either half of another col
 - Hand-drawn theme; board-level default theme in `.markanban.yml`
 - `.markanban.yml` in the run folder pointing at a board folder
 - Editing unknown fields in the UI
+
+## Proposed: Replay (decided — not built yet)
+
+A separate, read-only mode that plays back how cards moved across the board over time.
+
+**Modes**
+- Normal board: unchanged, plus one "▶ Replay" button in the header. No replay controls are visible.
+- Replay mode: entered via that button. Board is read-only (no drag, no `+` buttons, no "+ Column", no card dialog), live file updates are held until exit. The filter row stays, so you can replay a subset (e.g. one assignee). A control bar appears: play/pause, timeline slider, replayed date/time clock, Exit.
+- Exit returns to the live board and removes the control bar.
+
+**Playback**
+- Play runs at a fixed **8 hours per second**. No speed selector: drag the timeline slider to go faster, slower or backwards.
+- The timeline runs from the earliest event to now.
+
+**Data (client-side only, no server or file changes)**
+- Rebuilt from the changelogs already returned by `/api/board`; no extra file reads.
+- A card appears at its earliest known time: `card: created` line → `created` field → file birthtime.
+- Its starting column is the `from` of its first status change, else its current status.
+- `archived` hides it; unarchive brings it back.
+- Other field changes are not replayed; cards show their current heading and fields.
+- If building the timeline is ever noticeably slow, show a "Preparing replay…" loading state.
+
+**Board**
+- Statuses no longer in use appear as a column only while they hold cards, ordered by the normal column rules.
+- Moving cards slide between columns (Web Animations API, no dependency). New cards fade in, archived fade out. Animations are cut short at high speed so they never lag the clock.
+
+**Known gap (accepted)**
+- Edits made outside the UI aren't in the changelog, so such a card jumps to its current column at the end. Replay is only as complete as the changelog.
