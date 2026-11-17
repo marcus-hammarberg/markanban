@@ -116,6 +116,7 @@ Actions:
 - Archive / unarchive
 - "Show archived" toggle (archived cards greyed out; they never create columns)
 - History view per card
+- Ctrl/⌘+Enter in the card dialog saves the card (in the comment box it adds the comment instead)
 
 **No delete** in v1. Remove the file yourself.
 

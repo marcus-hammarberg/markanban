@@ -352,6 +352,13 @@ function changes() {
   return { fields, body };
 }
 
+// Ctrl/⌘+Enter saves the card from any field, except the comment box where it adds the comment.
+form.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.target.id === 'new-comment') return;
+  e.preventDefault();
+  form.requestSubmit(form.querySelector('button[value="save"]'));
+});
+
 form.addEventListener('submit', (e) => {
   if (e.submitter?.value !== 'save' || !current) return;
   const { fields, body } = changes();
