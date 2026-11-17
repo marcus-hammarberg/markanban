@@ -58,3 +58,63 @@ test('API: create, move, archive, reorder, and refuse unsafe requests', async (t
   assert.equal(rebound, 403);
   assert.ok(!(await readdir(dir)).some((f) => f.endsWith('.tmp')));
 });
+
+test('static UI files are served, nothing outside public/ is, and bad JSON is refused', async (t) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'markanban-'));
+  const server = createServer(createStorage(dir), 'tester');
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const port = (server.address() as AddressInfo).port;
+
+  // Raw request: the path is sent exactly as written (fetch would normalise "../" away first).
+  const request = (method: string, rawPath: string, body?: string, contentType = 'application/json') =>
+    new Promise<{ status: number; type: string; text: string }>((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port, method, path: rawPath, headers: { host: 'localhost', 'content-type': contentType } }, (res) => {
+        let text = '';
+        res.setEncoding('utf8');
+        res.on('data', (c) => { text += c; });
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, type: String(res.headers['content-type']), text }));
+      });
+      req.on('error', reject);
+      req.end(body);
+    });
+
+  // Static files, with the right content type.
+  const index = await request('GET', '/');
+  assert.equal(index.status, 200);
+  assert.equal(index.type, 'text/html');
+  assert.match(index.text, /<title>Markanban<\/title>/);
+  assert.equal((await request('GET', '/app.js')).type, 'text/javascript');
+  assert.equal((await request('GET', '/style.css')).type, 'text/css');
+  assert.equal((await request('GET', '/themes/dark.css')).status, 200);
+  assert.equal((await request('GET', '/nope.html')).status, 404);
+  assert.equal((await request('GET', '/api/nope')).status, 404);
+
+  // Nothing outside public/ is reachable: package.json and src/ sit right next to it.
+  for (const p of ['/../package.json', '/%2e%2e/package.json', '/..%2Fpackage.json', '/..%5Cpackage.json', '/../src/server.ts', '//etc/passwd']) {
+    const res = await request('GET', p);
+    assert.equal(res.status, 404, p);
+    assert.doesNotMatch(res.text, /"dependencies"|createServer|root:/, p);
+  }
+
+  // Invalid request bodies are refused with a clear error, and nothing is written.
+  const post = (body: string) => request('POST', '/api/cards', body);
+  const invalid = await post('{oops');
+  assert.equal(invalid.status, 400);
+  assert.deepEqual(JSON.parse(invalid.text), { error: 'Invalid JSON' });
+  assert.equal((await post('[]')).status, 400);
+  assert.equal((await post('"just a string"')).status, 400);
+  assert.equal((await post('')).status, 400);
+  assert.match((await post('{"heading": 5}')).text, /heading must be a string/);
+  assert.equal((await post('{"heading": "  "}')).status, 400);
+  assert.equal((await post(JSON.stringify({ heading: 'x'.repeat(1_000_001) }))).status, 413);
+
+  await writeFile(path.join(dir, 'card.md'), '---\nstatus: todo\n---\n# Card\n');
+  const patch = (body: string) => request('PATCH', '/api/cards/card.md', body);
+  assert.match((await patch('{"fields": {"status": 5}}')).text, /status must be a string/);
+  assert.match((await patch('{"fields": "todo"}')).text, /fields must be an object/);
+  assert.match((await patch('{"archive": "yes"}')).text, /archive must be a boolean/);
+  assert.match((await patch('{"comment": 1}')).text, /comment must be a string/);
+  assert.equal(await readFile(path.join(dir, 'card.md'), 'utf8'), '---\nstatus: todo\n---\n# Card\n');
+  assert.deepEqual(await readdir(dir), ['card.md']);
+});
