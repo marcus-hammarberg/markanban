@@ -19,7 +19,7 @@ npx markanban [folder]     # folder defaults to .
 
 A card is any `*.md` file directly in the board folder.
 
-- Excluded: `README.md`, hidden files (`.*`), subfolders.
+- Excluded: `README.md`, hidden files (`.*`), subfolders (a folder named after a card holds its attachments, see Attachments).
 - Files without front-matter are still cards.
 - Sync-conflict copies (`name (1).md`, `name (conflicted copy).md`, etc.) are shown as normal cards with a ⚠️ "possible sync conflict" badge. No auto-merge.
 
@@ -118,6 +118,7 @@ Actions:
 - Archive / unarchive
 - "Show archived" toggle (archived cards greyed out; they never create columns)
 - History view per card
+- Attachments: upload by button, drop or paste; listed in the card dialog (see Attachments)
 - Link to a card: 🔗 in the card dialog copies its link (see Card links)
 - Ctrl/⌘+Enter in the card dialog saves the card (in the comment box it adds the comment instead)
 
@@ -162,7 +163,7 @@ Every card has a link, so it can be pasted into chat, a ticket or a note. Client
 
 ### Filters
 
-A row above the board: free-text search (heading + body), and selects for type, assignee and tag, each with a "No …" option. Options are built from the current cards. Filters combine, apply to archived cards too, are client-side only, and reset on reload.
+A row above the board: free-text search (heading, body, comments, attachment names), and selects for type, assignee and tag, each with a "No …" option. Options are built from the current cards. Filters combine, apply to archived cards too, are client-side only, and reset on reload.
 
 ### Column reordering
 
@@ -171,7 +172,7 @@ Drag a column by its header (⠿ grip) and drop it on either half of another col
 ### Live updates & safe writes
 
 - Server watches the folder (`fs.watch`) and pushes changes to the browser via Server-Sent Events.
-- It also polls every 3 seconds (card and config file names, sizes and mtimes; no contents), because synced folders (Drive for desktop, SMB shares) often fire no file events for remote changes. Always on, no flag. A failed poll (share briefly unreachable) is skipped, never an error.
+- It also polls every 3 seconds (card, attachment and config file names, sizes and mtimes; no contents), because synced folders (Drive for desktop, SMB shares) often fire no file events for remote changes. Always on, no flag. A failed poll (share briefly unreachable) is skipped, never an error.
 - A card file that can't be read (permissions, etc.) is left out of the board with a warning; it never fails the whole board. A file that vanishes mid-listing is skipped silently.
 - Every write re-reads the file from disk and applies only the targeted change (one field, or append one changelog line). Never write back a stale full copy.
 
@@ -261,13 +262,44 @@ A separate, read-only mode that plays back how cards moved across the board over
 **Known gap (accepted)**
 - Edits made outside the UI aren't in the changelog, so such a card jumps to its current state at the end. Replay is only as complete as the changelog.
 
+### Attachments
+
+Every file in a sibling folder named after the card file is an attachment: `fix-login-bug.md` → `fix-login-bug/`. The folder is the truth, so files dropped in by hand count too. Card filenames never change, so the link can't break, and a relative body link (`fix-login-bug/shot.png`) works in any markdown viewer.
+
+**Dialog**
+- An "Attachments (n)" section below the body, above Comments. Collapsed by default, like Comments and History; opens after an upload.
+- One link per file, filename only, opening in a new tab. No previews, no sizes.
+- Hidden while creating a card (no file yet, so no folder name).
+- Cards show a 📎 count. Search matches attachment filenames.
+
+**Upload**
+- An "Add file" button (native file input), dropping a file anywhere on the dialog, or pasting when the clipboard holds a file (pasting text still works as before).
+- The folder is created on the first upload. The original name is kept; on collision `-2`, `-3`… (the same logic as new card filenames). Never overwrites. Names are sanitized: no path, no leading `.`, no control characters.
+- Raw request body with a required `X-Markanban: 1` header (the CSRF guard for uploads: a cross-site page can't send it without a CORS preflight, which is never answered). Max 50 MB. Streamed to a temp file, then renamed into place.
+- Logs `attachment: added <name>` in the changelog. The file is saved first; if the log line fails, the upload stays and a warning is shown. Files added by hand are not logged. Replay ignores these lines.
+
+**Serving**
+- Only png, jpg, gif and webp are shown inline; everything else is sent as `Content-Disposition: attachment`. Every response has `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox`, so an `.html` or `.svg` attachment can't run script against the API.
+- `GET /api/cards/<card>/attachments/<file>` serves a file; `POST /api/cards/<card>/attachments?name=<file name>` uploads one and returns `{ name }` (plus `warning` if the log line failed).
+- Paths are `<card>/<file>` only: one level, no `..`, no hidden files. Checked in `storage.ts`.
+
+**Live updates and storage**
+- The 3-second poll also checks each card folder (names, sizes, mtimes; no contents).
+- `storage.ts` gets `listAttachments`, `readAttachment` and `writeAttachment`, so a Drive/hosted backend still replaces one module.
+
+**Edge cases (accepted)**
+- Archiving leaves the folder alone. A card file renamed or deleted by hand leaves an orphan folder, which is ignored and never touched. A sync-conflict copy (`name (1).md`) has no attachments of its own.
+
+**Not included**
+- Removing attachments in the UI (remove the file yourself), previews or thumbnails, inserting links into the body.
+
 ## Tech
 
 - TypeScript on Node 22+, published as compiled JS (runs via `npx`).
 - Runtime dependency: `yaml` (Document API, preserves comments/order). Dev: `typescript`.
 - Server: `node:http`, `fs.watch` + polling, SSE. Frontend: plain HTML/CSS/JS, native drag & drop, no framework.
-- Storage module with exactly four operations: `list`, `read`, `write`, `watch`. No other abstraction.
-- Security: bind to `127.0.0.1` only. All file paths resolved and verified to be inside the board folder (no `../` escape).
+- Storage module with exactly seven operations: `list`, `read`, `write`, `watch`, and `listAttachments`, `readAttachment`, `writeAttachment`. No other abstraction.
+- Security: bind to `127.0.0.1` only. All file paths resolved and verified to be inside the board folder (no `../` escape). JSON writes require `application/json`, uploads require the `X-Markanban: 1` header (both force a CORS preflight, which is never answered). Attachments are served with `nosniff` and `CSP: sandbox`; only safe image types inline.
 - Preserve line endings (CRLF on Windows). macOS primary; Linux/Windows should work via Node.
 
 ## Shared folders
@@ -284,7 +316,6 @@ Sharing a board = putting the folder in a sync client's folder (Google Drive for
 ## Deferred (not v1)
 
 - Swimlanes from subfolders
-- Attachments in a folder per card
 - Hosted version
 - Logging external edits
 - LAN access flag

@@ -132,6 +132,14 @@ textarea { font-family: var(--font-mono); resize: vertical; }
 #new-comment { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 8px; background: var(--bg); color: var(--text); }
 .history { font-family: var(--font-mono); font-size: 12px; color: var(--muted); padding-left: 18px; }
 summary { cursor: pointer; color: var(--muted); }
+.attachments { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.attachment-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.attachment-list a { color: var(--accent); overflow-wrap: anywhere; }
+.attachment-list .empty { list-style: none; margin-left: -18px; color: var(--muted); font-size: 12px; }
+.attachment-add { display: flex; align-items: center; gap: 8px; }
+.attachment-add .muted { color: var(--muted); font-size: 12px; }
+/* A file dragged over the card dialog: dropping uploads it as an attachment. */
+dialog.file-over { outline: 3px dashed var(--accent); outline-offset: -3px; }
 .dialog-foot { display: flex; align-items: center; gap: 8px; }
 .dialog-foot .muted { flex: 1; color: var(--muted); font-size: 12px; text-align: right; }
 

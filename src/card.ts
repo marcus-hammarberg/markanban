@@ -33,6 +33,7 @@ export interface Change {
   body?: string;
   archive?: boolean;
   comment?: string;
+  attachment?: string; // name of a file just uploaded to the card's folder: logged, nothing else changes
   rank?: number; // board housekeeping: written to front-matter, never logged
   created?: string; // the file's birthtime, stamped on the first write if the card has no `created`
 }
@@ -218,6 +219,11 @@ export function applyChange(raw: string, change: Change, who: string, now: strin
     if (!text) throw new Error('Comment is empty');
     comments = (comments ? comments.replace(/\s*$/, '\n\n') : '## Comments\n') + `### ${now} ${who}\n\n${text}\n`;
     log.push(`- ${now} ${who} comment: added`);
+  }
+
+  if (change.attachment !== undefined) {
+    if (/[\r\n]/.test(change.attachment)) throw new Error('Attachment name must be a single line');
+    log.push(`- ${now} ${who} attachment: added ${change.attachment}`);
   }
 
   if (change.rank !== undefined && data.rank !== change.rank) setKey(doc, 'rank', change.rank);

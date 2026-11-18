@@ -26,7 +26,7 @@
   <div id="error" class="error" hidden></div>
   <div id="warnings" class="warnings" hidden></div>
   <div class="filters" id="filters">
-    <input type="search" id="filter-q" placeholder="Search…" aria-label="Search heading and body">
+    <input type="search" id="filter-q" placeholder="Search…" aria-label="Search heading, body, comments and attachment names">
     <select id="filter-type" aria-label="Filter by type"></select>
     <select id="filter-assignee" aria-label="Filter by assignee"></select>
     <select id="filter-tag" aria-label="Filter by tag"></select>
@@ -56,6 +56,17 @@
       </div>
       <div id="extra" class="chips"></div>
       <label class="body-label"><textarea name="body" rows="12" aria-label="Body"></textarea></label>
+      <details id="attachments-section">
+        <summary id="attachments-title">Attachments</summary>
+        <div class="attachments">
+          <ul id="attachments" class="attachment-list"></ul>
+          <div class="attachment-add">
+            <button type="button" id="add-file">Add file</button>
+            <span class="muted">or drop or paste a file here</span>
+            <input type="file" id="file-input" multiple hidden>
+          </div>
+        </div>
+      </details>
       <details id="comments-section">
         <summary id="comments-title">Comments</summary>
         <div class="comments">

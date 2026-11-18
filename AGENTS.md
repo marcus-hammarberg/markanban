@@ -10,7 +10,7 @@ Markanban is a kanban board driven by a folder of markdown files. `SPEC.md` is t
 - **One storage seam.** Only `src/storage.ts` touches the filesystem; a Drive/hosted backend replaces that module alone.
 - **Lightweight.** Runtime dependency is `yaml`, nothing else. Reach for Node built-ins and native browser features (drag & drop, `<dialog>`, CSS) first; the frontend stays plain HTML/CSS/JS, no framework or bundler.
 - **Theme tokens only.** Components use CSS custom properties, never raw colors. A theme file under `public/themes/` redefines the tokens (including every `--type-<color>`) and may override any rule.
-- **Secure by default.** Keep the 127.0.0.1 bind, the Host-header check (DNS rebinding), the `application/json` requirement on writes (CSRF), and path validation in `storage.ts`.
+- **Secure by default.** Keep the 127.0.0.1 bind, the Host-header check (DNS rebinding), the `application/json` requirement on writes and the `X-Markanban` header on uploads (CSRF), `nosniff` + `CSP: sandbox` on served attachments, and path validation in `storage.ts`.
 - **Lint-clean markdown.** Headings Markanban writes (`## Comments`, `### <comment>`, `## Changelog`) get blank lines around them (markdownlint MD022).
 
 ## Workflow

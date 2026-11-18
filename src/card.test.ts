@@ -246,3 +246,11 @@ test('first write to a card without `created` stamps the birthtime; no-op writes
 test('a whitespace-only status counts as no status', () => {
   assert.equal(parseCard('---\nstatus: "  "\n---\nx', meta).status, null);
 });
+
+test('attachment: an upload is logged as one changelog line, the rest of the file untouched', () => {
+  // The only other change is the usual blank line after "## Changelog" (MD022).
+  const expected = sample.replace('## Changelog\n', '## Changelog\n\n') + `- ${NOW} anna attachment: added shot.png\n`;
+  assert.equal(applyChange(sample, { attachment: 'shot.png' }, 'anna', NOW), expected);
+  assert.equal(applyChange(sample.replace(/\n/g, '\r\n'), { attachment: 'shot.png' }, 'anna', NOW), expected.replace(/\n/g, '\r\n'));
+  assert.throws(() => applyChange(sample, { attachment: 'a\n## Changelog' }, 'anna', NOW), /single line/);
+});

@@ -95,7 +95,7 @@ const filterEls = { q: $('#filter-q'), type: $('#filter-type'), assignee: $('#fi
 
 function matches(card) {
   const q = filterEls.q.value.trim().toLowerCase();
-  const text = [card.heading, card.body, ...card.comments.map((c) => c.text)].join('\n');
+  const text = [card.heading, card.body, ...card.comments.map((c) => c.text), ...card.attachments].join('\n');
   if (q && !text.toLowerCase().includes(q)) return false;
   for (const key of ['type', 'assignee']) {
     const v = filterEls[key].value;
@@ -142,6 +142,9 @@ async function load() {
   try {
     board = await api('GET', '/api/board');
     render();
+    // Files dropped into the card's folder by hand show up in the open dialog too (fields are left alone).
+    const open = current && board.cards.find((c) => c.name === current.name);
+    if (open) { current.attachments = open.attachments; renderAttachments(current); }
     if (!hashSynced) { hashSynced = true; syncFromHash(); }
   } catch (e) {
     showError(`Could not load board: ${e.message}`);
@@ -149,6 +152,7 @@ async function load() {
 }
 
 // live = false: a read-only card for replay (no drag, no dialog, no keyboard moves).
+// Call it with an arrow, never .map(cardEl): map's index would land in `live`, making the first card read-only.
 function cardEl(card, live = true) {
   const attrs = { class: 'card', 'data-name': card.name, 'data-color': card.color }; // color decided by the server
   return h('article', !live ? { ...attrs, title: 'Read-only during replay. Exit replay to edit.' } : {
@@ -172,10 +176,11 @@ function cardEl(card, live = true) {
   card.conflict && h('div', { class: 'warn' }, '⚠️ Possible sync conflict copy'),
   card.error && h('div', { class: 'warn' }, '⚠️ Front-matter has invalid YAML'),
   card.rankError && h('div', { class: 'warn', title: card.rankError }, '⚠️ Invalid rank, fixed on next move'),
-  (card.type || card.assignee || card.comments.length > 0) && h('div', { class: 'meta' },
+  (card.type || card.assignee || card.comments.length > 0 || card.attachments.length > 0) && h('div', { class: 'meta' },
     card.type && h('span', { class: 'type-chip' }, card.type),
     card.assignee && h('span', {}, `@${card.assignee}`),
-    card.comments.length > 0 && h('span', { title: `${card.comments.length} comment(s)` }, `💬 ${card.comments.length}`)),
+    card.comments.length > 0 && h('span', { title: `${card.comments.length} comment(s)` }, `💬 ${card.comments.length}`),
+    card.attachments.length > 0 && h('span', { title: `${card.attachments.length} attachment(s)` }, `📎 ${card.attachments.length}`)),
   (card.tags.length || Object.keys(card.extra).length) ? h('div', { class: 'chips' },
     card.tags.map((t) => h('span', { class: 'chip' }, t)),
     Object.entries(card.extra).map(([k, v]) => h('span', { class: 'chip extra' }, `${k}: ${v}`))) : null);
@@ -335,7 +340,7 @@ function columnEl(col, cards) {
       if (heading?.trim()) act(() => api('POST', '/api/cards', { heading, status: col.key }));
     },
   }, '+'));
-  const el = h('section', { class: 'column' }, head, cards.map(cardEl));
+  const el = h('section', { class: 'column' }, head, cards.map((c) => cardEl(c)));
   dropZone(el, (name, before) => moveCard(name, col.key, before), true);
   if (movable) columnDropZone(el, col.key);
   return el;
@@ -369,7 +374,7 @@ function render() {
   const archived = showArchived.checked ? visible.filter((c) => c.archived) : [];
   const archivedCol = archived.length ? h('section', { class: 'column archived' },
     h('div', { class: 'column-head' }, h('span', { class: 'title' }, 'Archived'), h('span', { class: 'count' }, String(archived.length))),
-    archived.map(cardEl)) : null;
+    archived.map((c) => cardEl(c))) : null;
 
   // Every redraw (own actions and live updates) keeps keyboard focus on the same card.
   const focused = document.activeElement?.closest?.('#board .card')?.dataset.name;
@@ -400,7 +405,7 @@ function showCard(card) {
   form.body.value = card.body.trimEnd();
   form.querySelectorAll('input, textarea').forEach((el) => { el.disabled = !!card.error; });
   $('#extra').replaceChildren(...Object.entries(card.extra).map(([k, v]) => h('span', { class: 'chip extra', title: 'Edit in the file' }, `${k}: ${v}`)));
-  $('#comments-section').open = $('#history-section').open = false; // collapsed by default
+  $('#attachments-section').open = $('#comments-section').open = $('#history-section').open = false; // collapsed by default
   $('#new-comment').value = '';
   $('#new-comment').disabled = $('#add-comment').disabled = !!card.error;
   renderLog(card);
@@ -417,10 +422,67 @@ function renderLog(card) {
       h('div', { class: 'who' }, `${c.who} · ${day(c.at)}`),
       h('div', { class: 'text' }, c.text)))
     : [h('li', { class: 'empty' }, 'No comments yet')]));
+  renderAttachments(card);
   $('#history').replaceChildren(...(card.history.length ? card.history : ['No changes yet']).map((l) => h('li', {}, l)));
   $('#dates').textContent = [card.created && `Created ${day(card.created)}`, `Changed ${day(card.mtime)}`, card.archived && `Archived ${day(card.archived)}`]
     .filter(Boolean).join(' · ');
 }
+
+// --- attachments: files in the card's folder (fix-bug.md → fix-bug/) ------------
+
+const attachmentUrl = (card, file) => `/api/cards/${encodeURIComponent(card)}/attachments/${encodeURIComponent(file)}`;
+
+function renderAttachments(card) {
+  const files = card.attachments;
+  $('#attachments-title').textContent = files.length ? `Attachments (${files.length})` : 'Attachments';
+  $('#attachments').replaceChildren(...(files.length
+    ? files.map((f) => h('li', {}, h('a', { href: attachmentUrl(card.name, f), target: '_blank', rel: 'noopener' }, f)))
+    : [h('li', { class: 'empty' }, 'No attachments yet')]));
+}
+
+// Raw bytes, not JSON: the X-Markanban header is what keeps other websites from uploading (see SPEC.md).
+async function uploadFiles(files) {
+  if (!current || !files.length) return;
+  const name = current.name;
+  const warnings = [];
+  await act(async () => {
+    for (const file of files) {
+      const res = await fetch(`/api/cards/${encodeURIComponent(name)}/attachments?name=${encodeURIComponent(file.name)}`,
+        { method: 'POST', headers: { 'x-markanban': '1' }, body: file });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(`${file.name}: ${data.error || `${res.status} ${res.statusText}`}`);
+      if (data.warning) warnings.push(data.warning);
+    }
+  });
+  if (warnings.length) showError(warnings.join(' '));
+  if (current?.name === name) $('#attachments-section').open = true;
+}
+
+$('#add-file').addEventListener('click', () => $('#file-input').click());
+$('#file-input').addEventListener('change', (e) => {
+  uploadFiles([...e.target.files]);
+  e.target.value = '';
+});
+// Pasting a file (a screenshot, a file copied in Finder) uploads it; pasting text works as before.
+form.addEventListener('paste', (e) => {
+  const files = [...(e.clipboardData?.files ?? [])];
+  if (!files.length) return;
+  e.preventDefault();
+  uploadFiles(files);
+});
+const hasFiles = (e) => e.dataTransfer?.types.includes('Files');
+dialog.addEventListener('dragover', (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dialog.classList.add('file-over');
+});
+dialog.addEventListener('dragleave', (e) => { if (!dialog.contains(e.relatedTarget)) dialog.classList.remove('file-over'); });
+dialog.addEventListener('drop', (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dialog.classList.remove('file-over');
+  uploadFiles([...e.dataTransfer.files]);
+});
 
 async function addComment() {
   const text = $('#new-comment').value;

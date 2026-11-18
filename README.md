@@ -27,7 +27,7 @@ A new, empty board shows only **+ Column**. Click it to add your first column (f
 
 ## Cards
 
-A card is any `.md` file directly in the folder. `README.md`, hidden files and subfolders are ignored. A file doesn't need anything special to be a card:
+A card is any `.md` file directly in the folder. `README.md`, hidden files and subfolders are ignored (except a card's attachments folder, see [Attachments](#attachments)). A file doesn't need anything special to be a card:
 
 ```markdown
 Just an idea I had.
@@ -74,8 +74,9 @@ To change the order, drag a column by its header (⠿), or hover over the header
 - **Edit** by clicking a card: change its fields and text, then **Save** (or press Ctrl/⌘+Enter).
 - **Link** to a card with the 🔗 in its dialog: it copies an address (like `http://localhost:4242/#card=fix-login-bug.md`) that opens the card. Teammates need to use the same port.
 - **Comment** in the Comments section at the bottom of the card (collapsed until you open it, with the number of comments shown). Comments are saved in the card file.
+- **Attach files** in the Attachments section of the card: **Add file**, drop a file on the card, or paste one (a screenshot, say). See [Attachments](#attachments).
 - **Archive** cards you're done with. They disappear from the board; tick **Show archived** to see them again and unarchive. There's no delete button: to remove a card for good, delete its file.
-- **Filter** with the row above the board: search text (headings, card text and comments), or pick a type, assignee or tag.
+- **Filter** with the row above the board: search text (headings, card text, comments and attachment names), or pick a type, assignee or tag.
 - **Replay** shows how the board got here: **▶ Replay** in the top right plays back how cards moved between columns, 8 hours per second. Drag the slider to jump around, and use the filters to follow one person or tag. The board is read-only while replaying; **Exit replay** brings back the live board.
 - **Theme**: the board follows your system's light or dark mode. The button in the top right switches between System, Light and Dark.
 
@@ -138,6 +139,16 @@ Comments and history use your name. Markanban picks it from, in order:
 2. the `MARKANBAN_USER` environment variable (e.g. `export MARKANBAN_USER=anna` in your shell profile)
 3. your computer's login name
 
+## Attachments
+
+A card's files live in a folder next to it with the same name: the attachments of `fix-login-bug.md` are the files in `fix-login-bug/`. Every file in that folder is an attachment, so you can also drop files in with Finder or Explorer; they show up within a few seconds. Cards with attachments show 📎 and the number of files.
+
+- Uploading keeps the file's name. If the name is taken, the new file becomes `shot-2.png`, `shot-3.png`, and so on; nothing is ever overwritten. Files can be up to 50 MB.
+- Uploads from the board are recorded in the history (`attachment: added shot.png`); files you add by hand aren't.
+- Clicking an attachment opens it in a new tab. Images (png, jpg, gif, webp) show in the browser; other files download.
+- To link a file from the card text, use its path: `![](fix-login-bug/shot.png)`. That works in any markdown viewer.
+- There's no remove button: delete the file from the folder.
+
 ## Sharing a board
 
 Put the folder in a synced folder (Google Drive for desktop, Dropbox, OneDrive) or on a network share, and have each person run Markanban on their own computer, pointed at their local copy:
@@ -155,7 +166,7 @@ Markanban only accepts connections from your own computer; it isn't reachable fr
 
 ## Limitations
 
-- Swimlanes, attachments and a hosted version aren't there yet.
+- Swimlanes and a hosted version aren't there yet.
 - Card text and comments are shown as plain text; markdown isn't rendered yet.
 - Changes made outside the board (in an editor or by sync) aren't recorded in the history, so Replay can't show them: such a card jumps to where it is now at the end.
 - A card file Markanban can't read (for example, no permission) is left out and a warning names it.

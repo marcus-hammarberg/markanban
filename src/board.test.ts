@@ -121,6 +121,14 @@ test('replay: without card: created the created field is used, and (none) means 
   ]);
 });
 
+test('replay: other changelog lines that mention status are not status changes', () => {
+  const r = replay([rc({ status: 'todo', history: [
+    '2026-11-02T00:00:00Z m attachment: added status: todo → done.png',
+    '2026-11-03T00:00:00Z m heading: status: todo → done',
+  ] })], [], cfg, END);
+  assert.deepEqual(r.steps['a.md'], [{ at: t('2026-11-01T00:00:00Z'), status: 'todo', archived: false }]);
+});
+
 test('replay: archive hides and unarchive brings back', () => {
   const r = replay([rc({ status: 'todo', history: [
     '2026-11-02T00:00:00Z m archived: (none) → 2026-11-02T00:00:00Z',

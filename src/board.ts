@@ -162,7 +162,8 @@ export function placeCard(column: Rankable[], before: string | null): { rank: nu
 export interface Step { at: number; status: string | null; archived: boolean } // state from `at` (ms) on
 export interface ReplayCard { name: string; status: string | null; archived: string | null; created: string; history: string[] }
 
-const CHANGE = /^(\S+) .+? (status|archived): (.*?) → (.*)$/;
+// The name never contains ": ", so a heading or file name that mentions "status: a → b" can't pass for a change.
+const CHANGE = /^(\S+) (?:(?!: ).)+? (status|archived): (.*?) → (.*)$/;
 const CREATED = /^(\S+) .+? card: created$/;
 const logValue = (v: string) => (v === '(none)' ? null : v);
 

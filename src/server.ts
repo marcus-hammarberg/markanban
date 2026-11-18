@@ -10,6 +10,9 @@ import type { Storage } from './storage.ts';
 const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
 const TYPES: Record<string, string> = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml' };
 const MAX_BODY = 1_000_000;
+const MAX_ATTACHMENT = 50 * 1024 * 1024;
+// Only these show in the browser; everything else downloads, so an .html or .svg can't run script here.
+const INLINE: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' };
 // ISO 8601 UTC, whole seconds: the timestamp format used in every card file.
 const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
@@ -48,10 +51,10 @@ export function createServer(storage: Storage, user: string) {
     const config = parseConfig((await storage.read(CONFIG_FILE)) ?? '');
     // All board rules are decided here; the browser only displays the result.
     const { files, unreadable } = await storage.list();
-    const cards = files.map((f) => {
+    const cards = (await Promise.all(files.map(async (f) => {
       const card = parseCard(f.text, f);
-      return { ...card, color: typeColor(card.type, config.types) };
-    }).sort(rankOrder); // within each column: priority order, top first
+      return { ...card, color: typeColor(card.type, config.types), attachments: await storage.listAttachments(f.name) };
+    }))).sort(rankOrder); // within each column: priority order, top first
     const active = cards.filter((c) => !c.archived);
     const columns = orderColumns(active.flatMap((c) => (c.status ? [c.status] : [])), config.columns)
       .map((s) => ({ key: s as string | null, label: s }));
@@ -144,6 +147,45 @@ export function createServer(storage: Storage, user: string) {
     return { name };
   }
 
+  // Uploads are raw bytes, not JSON, so the CSRF guard is a custom header instead: a cross-site page
+  // can't send one without a CORS preflight, and this server never answers preflights.
+  async function uploadAttachment(card: string, wanted: string | null, req: http.IncomingMessage) {
+    if (req.headers['x-markanban'] !== '1') throw new HttpError(403, 'Missing X-Markanban header');
+    if (!wanted?.trim()) throw new HttpError(400, 'name is required');
+    if (Number(req.headers['content-length']) > MAX_ATTACHMENT) throw new HttpError(413, 'Attachments can be at most 50 MB');
+    if ((await storage.read(card)) === null) throw new HttpError(404, `No card ${card}`);
+    async function* limited() {
+      let size = 0;
+      for await (const chunk of req as AsyncIterable<Buffer>) {
+        size += chunk.length;
+        if (size > MAX_ATTACHMENT) throw new HttpError(413, 'Attachments can be at most 50 MB');
+        yield chunk;
+      }
+    }
+    const name = await storage.writeAttachment(card, wanted, limited());
+    // The file is saved; a changelog problem (say, broken front-matter) must not lose it.
+    try {
+      const raw = await storage.read(card);
+      if (raw !== null) await storage.write(card, await applyTo(card, raw, { attachment: name }));
+      return { name };
+    } catch (e) {
+      return { name, warning: `${name} was saved, but the changelog line could not be written (${(e as Error).message})` };
+    }
+  }
+
+  async function serveAttachment(card: string, file: string, res: http.ServerResponse) {
+    const data = await storage.readAttachment(card, file);
+    if (data === null) throw new HttpError(404, 'Not found');
+    const type = INLINE[path.extname(file).toLowerCase()];
+    res.writeHead(200, {
+      'content-type': type ?? 'application/octet-stream',
+      'content-disposition': `${type ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file)}`,
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': 'sandbox',
+    });
+    res.end(data);
+  }
+
   const statusColumns = async () => (await board()).columns.flatMap((c) => (c.key === null ? [] : [c.key]));
 
   // A column you can see doesn't vanish because a board action emptied it: if one would,
@@ -192,6 +234,7 @@ export function createServer(storage: Storage, user: string) {
         res.end(JSON.stringify(data));
       };
       const cardMatch = /^\/api\/cards\/([^/]+)$/.exec(url.pathname);
+      const attachMatch = /^\/api\/cards\/([^/]+)\/attachments(?:\/([^/]+))?$/.exec(url.pathname);
 
       if (req.method === 'GET' && url.pathname === '/api/board') {
         const b = await board();
@@ -206,6 +249,12 @@ export function createServer(storage: Storage, user: string) {
       }
       if (req.method === 'POST' && url.pathname === '/api/cards') return send(await createCard(await readJson(req)), 201);
       if (req.method === 'PATCH' && cardMatch) return send(await updateCard(decodeURIComponent(cardMatch[1]), await readJson(req)));
+      if (req.method === 'POST' && attachMatch && !attachMatch[2]) {
+        return send(await uploadAttachment(decodeURIComponent(attachMatch[1]), url.searchParams.get('name'), req), 201);
+      }
+      if (req.method === 'GET' && attachMatch?.[2]) {
+        return await serveAttachment(decodeURIComponent(attachMatch[1]), decodeURIComponent(attachMatch[2]), res);
+      }
       if (req.method === 'PUT' && url.pathname === '/api/config/columns') return send(await saveColumns(await readJson(req)));
       if (req.method === 'GET' && !url.pathname.startsWith('/api/')) return await serveStatic(url.pathname, res);
       throw new HttpError(404, 'Not found');

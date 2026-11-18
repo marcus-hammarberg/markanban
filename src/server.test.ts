@@ -224,3 +224,70 @@ test('unreadable cards are skipped with a warning; editing keeps the card date',
   assert.equal(board.cards[0].created, before.replace(/\.\d+Z$/, 'Z'));
   assert.match(await readFile(path.join(dir, 'ok.md'), 'utf8'), /created: /);
 });
+
+test('attachments: upload, list, log, serve safely, refuse cross-site and unsafe requests', async (t) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'markanban-'));
+  await writeFile(path.join(dir, 'fix-bug.md'), '# Fix bug\n');
+  const server = createServer(createStorage(dir), 'tester');
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const base = `http://localhost:${(server.address() as AddressInfo).port}`;
+  const upload = (card: string, name: string, body: string, headers: Record<string, string> = { 'x-markanban': '1' }) =>
+    fetch(`${base}/api/cards/${card}/attachments?name=${encodeURIComponent(name)}`, { method: 'POST', headers, body });
+  const get = (card: string, file: string) => fetch(`${base}/api/cards/${card}/attachments/${encodeURIComponent(file)}`);
+
+  let res = await upload('fix-bug.md', 'shot.png', 'PNG');
+  assert.equal(res.status, 201);
+  assert.deepEqual(await res.json(), { name: 'shot.png' });
+  assert.deepEqual(await (await upload('fix-bug.md', 'shot.png', 'PNG2')).json(), { name: 'shot-2.png' });
+  await upload('fix-bug.md', 'page.html', '<script>alert(1)</script>');
+  assert.match(await readFile(path.join(dir, 'fix-bug.md'), 'utf8'), /tester attachment: added shot\.png\n.*attachment: added shot-2\.png\n/);
+
+  const board = await (await fetch(`${base}/api/board`)).json();
+  assert.deepEqual(board.cards[0].attachments, ['page.html', 'shot-2.png', 'shot.png']);
+
+  // Images show inline; anything else downloads; nothing can run script on this origin.
+  res = await get('fix-bug.md', 'shot.png');
+  assert.equal(await res.text(), 'PNG');
+  assert.equal(res.headers.get('content-type'), 'image/png');
+  assert.match(String(res.headers.get('content-disposition')), /^inline/);
+  res = await get('fix-bug.md', 'page.html');
+  assert.equal(res.headers.get('content-type'), 'application/octet-stream');
+  assert.match(String(res.headers.get('content-disposition')), /^attachment; filename\*=UTF-8''page\.html/);
+  for (const r of [res, await get('fix-bug.md', 'shot.png')]) {
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(r.headers.get('content-security-policy'), 'sandbox');
+  }
+  assert.equal((await get('fix-bug.md', 'missing.png')).status, 404);
+  assert.equal((await get('fix-bug.md', '..%2Ffix-bug.md')).status, 400);
+
+  // Refusals: no custom header (a cross-site form can't send one), unknown card, too large.
+  assert.equal((await upload('fix-bug.md', 'x.txt', 'x', { 'content-type': 'text/plain' })).status, 403);
+  assert.equal((await upload('missing.md', 'x.txt', 'x')).status, 404);
+  assert.equal((await upload('fix-bug.md', '', 'x')).status, 400);
+  const tooLarge = await new Promise<number | undefined>((resolve, reject) => {
+    const req = http.request(`${base}/api/cards/fix-bug.md/attachments?name=big.bin`, { method: 'POST', headers: { 'x-markanban': '1', 'content-length': String(60_000_000) } },
+      (r) => { r.resume(); resolve(r.statusCode); });
+    req.on('error', () => resolve(413)); // the server may hang up before the body is sent
+    req.end();
+  });
+  assert.equal(tooLarge, 413);
+  assert.deepEqual((await readdir(path.join(dir, 'fix-bug'))).sort(), ['page.html', 'shot-2.png', 'shot.png']);
+});
+
+test('attachments: the upload is kept even if the changelog line cannot be written', async (t) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'markanban-'));
+  const broken = '---\nstatus: [oops\n---\n# Broken\n';
+  await writeFile(path.join(dir, 'broken.md'), broken);
+  const server = createServer(createStorage(dir), 'tester');
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const base = `http://localhost:${(server.address() as AddressInfo).port}`;
+  const res = await fetch(`${base}/api/cards/broken.md/attachments?name=a.txt`, { method: 'POST', headers: { 'x-markanban': '1' }, body: 'keep me' });
+  assert.equal(res.status, 201);
+  const data = await res.json();
+  assert.equal(data.name, 'a.txt');
+  assert.match(data.warning, /a\.txt was saved, but .*changelog/);
+  assert.equal(await readFile(path.join(dir, 'broken', 'a.txt'), 'utf8'), 'keep me');
+  assert.equal(await readFile(path.join(dir, 'broken.md'), 'utf8'), broken);
+});
