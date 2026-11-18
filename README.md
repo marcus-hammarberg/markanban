@@ -169,3 +169,10 @@ npm install
 npm test
 npm start -- ./some-board
 ```
+
+To see Replay in action, generate a demo board: the story of how Markanban itself was built, about 20 cards dated over the last three weeks.
+
+```sh
+npm run demo -- ./demo-board   # needs a new or empty folder
+npm start -- ./demo-board      # then press ▶ Replay
+```

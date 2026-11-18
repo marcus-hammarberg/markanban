@@ -254,6 +254,9 @@ A separate, read-only mode that plays back how cards moved across the board over
 **Card order**
 - Ranks aren't logged, so order changes can't be replayed; cards in a replayed column are shown in their current order.
 
+**Demo board**
+- `npm run demo [folder]` (`src/demo.ts`, default `demo-board`) writes a board telling how Markanban was built: the real commit order, stretched over three weeks and dated back from today so the story ends just now. Cards are written with `newCard`/`applyChange`, exactly as the UI would. Refuses a folder that isn't new or empty; never overwrites. A dev script, not part of the CLI.
+
 **Known gap (accepted)**
 - Edits made outside the UI aren't in the changelog, so such a card jumps to its current state at the end. Replay is only as complete as the changelog.
 

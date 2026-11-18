@@ -17,7 +17,8 @@
     "build": "tsc",
     "prepare": "tsc",
     "test": "node --test \"src/**/*.test.ts\"",
-    "start": "node src/cli.ts"
+    "start": "node src/cli.ts",
+    "demo": "node src/demo.ts"
   },
   "license": "MIT",
   "dependencies": {
