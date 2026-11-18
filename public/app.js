@@ -151,7 +151,7 @@ async function load() {
 // live = false: a read-only card for replay (no drag, no dialog, no keyboard moves).
 function cardEl(card, live = true) {
   const attrs = { class: 'card', 'data-name': card.name, 'data-color': card.color }; // color decided by the server
-  return h('article', !live ? attrs : {
+  return h('article', !live ? { ...attrs, title: 'Read-only during replay. Exit replay to edit.' } : {
     ...attrs,
     tabindex: '0',
     draggable: card.archived ? 'false' : 'true',
@@ -609,6 +609,15 @@ $('#replay-start').addEventListener('click', () => {
 $('#replay-play').addEventListener('click', () => setPlaying(!replaying.playing));
 replayTime.addEventListener('input', () => { replaying.t = Number(replayTime.value); showReplayTime(); });
 $('#replay-exit').addEventListener('click', exitReplay);
+// Grabbing a card during replay points at the way out.
+boardEl.addEventListener('pointerdown', (e) => {
+  if (!replaying || !e.target.closest('.card')) return;
+  const exit = $('#replay-exit');
+  exit.classList.remove('nudge');
+  void exit.offsetWidth; // restart the animation on every grab
+  exit.classList.add('nudge');
+});
+$('#replay-exit').addEventListener('animationend', (e) => e.currentTarget.classList.remove('nudge'));
 
 // --- live updates ----------------------------------------------------------
 

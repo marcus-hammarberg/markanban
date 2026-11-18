@@ -232,6 +232,7 @@ A separate, read-only mode that plays back how cards moved across the board over
 **Modes**
 - Normal board: unchanged, plus one "▶ Replay" button in the header. No replay controls are visible.
 - Replay mode: entered via that button. Board is read-only (no drag, no `+` buttons, no "+ Column", no card dialog, no "Show archived"; `#card=` links are ignored), live file updates are held until exit. The filter row stays, so you can replay a subset (e.g. one assignee). A control bar appears: play/pause, timeline slider, replayed date/time clock, Exit.
+- Replay mode is unmistakable: the control bar starts with "● Replay · read-only" and is accent-tinted, the board gets an accent tint and frame, cards show a not-allowed cursor and a "Read-only during replay" tooltip, and pressing a card makes the Exit button pulse.
 - Exit returns to the live board (loading any held updates) and removes the control bar.
 
 **Playback**

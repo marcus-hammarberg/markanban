@@ -136,10 +136,15 @@ summary { cursor: pointer; color: var(--muted); }
 .dialog-foot .muted { flex: 1; color: var(--muted); font-size: 12px; text-align: right; }
 
 /* Replay: read-only playback with a control bar under the filters. */
-.replay-bar { display: flex; align-items: center; gap: var(--gap); padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+/* Replay must be impossible to miss: accent-tinted bar and board, plus a nudge on Exit when a card is grabbed. */
+.replay-bar { display: flex; align-items: center; gap: var(--gap); padding: 8px 16px; border-bottom: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+.replay-label { font-weight: 600; color: var(--accent); white-space: nowrap; }
+body.replaying .board { background: color-mix(in srgb, var(--accent) 6%, var(--bg)); box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+#replay-exit.nudge { animation: nudge 0.5s 2; }
+@keyframes nudge { 50% { box-shadow: 0 0 0 4px var(--accent); background: var(--accent); color: var(--accent-text); } }
 .replay-bar input[type="range"] { flex: 1; accent-color: var(--accent); }
 .replay-bar output { min-width: 11em; font-variant-numeric: tabular-nums; color: var(--muted); }
 body.replaying #replay-start, body.replaying .topbar .toggle { display: none; }
-body.replaying .card { cursor: default; }
+body.replaying .card { cursor: not-allowed; }
 body.replaying .card:hover { box-shadow: var(--shadow); }
 .card.ghost { position: fixed; margin: 0; pointer-events: none; }
