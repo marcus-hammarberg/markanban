@@ -47,6 +47,11 @@ test('API: create, move, archive, reorder, and refuse unsafe requests', async (t
   assert.equal(board.warnings.length, 1);
   assert.match(board.warnings[0], /unknown color "reddish"/);
 
+  // Replay: the server turns changelogs into steps; the browser only plays them.
+  const steps = board.replay.steps['fix-bug.md'];
+  assert.deepEqual(steps.map((s: { status: string }) => s.status), ['todo', 'doing']);
+  assert.ok(board.replay.start <= steps[0].at && steps[1].at <= board.replay.end);
+
   // Refusals
   assert.equal((await call('PATCH', '/api/cards/..%2Fescape.md', { fields: { status: 'x' } })).status, 400);
   assert.equal((await call('PATCH', '/api/cards/fix-bug.md', { fields: { created: 'x' } })).status, 400);

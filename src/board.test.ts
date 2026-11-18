@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { orderColumns, parseConfig, placeCard, rankOrder, setConfigColumns, typeColor } from './board.ts';
+import { orderColumns, parseConfig, placeCard, rankOrder, replay, setConfigColumns, typeColor } from './board.ts';
 
 test('common order first, then alphabetical', () => {
   assert.deepEqual(orderColumns(['zeta', 'Done', 'alpha', 'todo', 'In Progress'], []), ['todo', 'In Progress', 'Done', 'alpha', 'zeta']);
@@ -87,4 +87,77 @@ test('placeCard: renumbers the column in steps of 1000 when the gap runs out', (
 
 test('placeCard: unknown target card is an error', () => {
   assert.throws(() => placeCard([card('a', 1000)], 'zzz'), /zzz/);
+});
+
+// ---- Replay ----
+
+const END = Date.parse('2026-12-01T00:00:00Z');
+const t = (iso: string) => Date.parse(iso);
+const rc = (over: Partial<Parameters<typeof replay>[0][number]>) =>
+  ({ name: 'a.md', status: null, archived: null, created: '2026-11-01T00:00:00Z', history: [], ...over });
+const cfg = { columns: [], noStatusColumn: 'No status' };
+
+test('replay: a card appears at card: created and starts in the from of its first status change', () => {
+  const r = replay([rc({ status: 'done', created: '2026-11-05T00:00:00Z', history: [
+    '2026-11-02T00:00:00Z marcus card: created',
+    '2026-11-03T00:00:00Z marcus status: todo → doing',
+    '2026-11-04T00:00:00Z marcus body: edited',
+    '2026-11-04T12:00:00Z Marcus H status: doing → done',
+  ] })], [], cfg, END);
+  assert.deepEqual(r.steps['a.md'], [
+    { at: t('2026-11-02T00:00:00Z'), status: 'todo', archived: false },
+    { at: t('2026-11-03T00:00:00Z'), status: 'doing', archived: false },
+    { at: t('2026-11-04T12:00:00Z'), status: 'done', archived: false },
+  ]);
+  assert.equal(r.start, t('2026-11-02T00:00:00Z'));
+  assert.equal(r.end, END);
+});
+
+test('replay: without card: created the created field is used, and (none) means no status', () => {
+  const r = replay([rc({ status: 'todo', history: ['2026-11-03T00:00:00Z m status: (none) → todo'] })], [], cfg, END);
+  assert.deepEqual(r.steps['a.md'], [
+    { at: t('2026-11-01T00:00:00Z'), status: null, archived: false },
+    { at: t('2026-11-03T00:00:00Z'), status: 'todo', archived: false },
+  ]);
+});
+
+test('replay: archive hides and unarchive brings back', () => {
+  const r = replay([rc({ status: 'todo', history: [
+    '2026-11-02T00:00:00Z m archived: (none) → 2026-11-02T00:00:00Z',
+    '2026-11-03T00:00:00Z m archived: 2026-11-02T00:00:00Z → (none)',
+  ] })], [], cfg, END);
+  assert.deepEqual(r.steps['a.md'].map((s) => s.archived), [false, true, false]);
+});
+
+test('replay: an edit outside the UI jumps to the current state at the end', () => {
+  const r = replay([rc({ status: 'done', archived: '2026-11-20T00:00:00Z', history: ['2026-11-02T00:00:00Z m status: todo → doing'] })], [], cfg, END);
+  assert.deepEqual(r.steps['a.md'].at(-1), { at: END, status: 'done', archived: true });
+  // No jump when the log already ends in the current state.
+  const r2 = replay([rc({ status: 'doing', history: ['2026-11-02T00:00:00Z m status: todo → doing'] })], [], cfg, END);
+  assert.equal(r2.steps['a.md'].length, 2);
+});
+
+test('replay: unreadable timestamps are skipped, and an out-of-order log is sorted', () => {
+  const r = replay([rc({ status: 'c', created: 'whenever', history: [
+    'garbage m status: x → y',
+    '2026-11-04T00:00:00Z m status: b → c',
+    '2026-11-03T00:00:00Z m status: a → b',
+  ] })], [], cfg, END);
+  assert.deepEqual(r.steps['a.md'].map((s) => [s.at, s.status]), [
+    [t('2026-11-03T00:00:00Z'), 'a'], [t('2026-11-03T00:00:00Z'), 'b'], [t('2026-11-04T00:00:00Z'), 'c'],
+  ]);
+});
+
+test('replay: columns cover every status ever used, in normal column order, no status first', () => {
+  const r = replay([
+    rc({ name: 'a.md', status: 'done', history: ['2026-11-02T00:00:00Z m status: zeta → done'] }),
+    rc({ name: 'b.md', status: 'todo', history: ['2026-11-02T00:00:00Z m status: (none) → todo'] }),
+  ], ['review'], { columns: ['review'], noStatusColumn: 'Inbox' }, END);
+  assert.deepEqual(r.columns, [
+    { key: null, label: 'Inbox', current: false },
+    { key: 'review', label: 'review', current: true },
+    { key: 'todo', label: 'todo', current: false },
+    { key: 'done', label: 'done', current: false },
+    { key: 'zeta', label: 'zeta', current: false },
+  ]);
 });

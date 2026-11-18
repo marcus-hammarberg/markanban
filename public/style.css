@@ -134,3 +134,12 @@ textarea { font-family: var(--font-mono); resize: vertical; }
 summary { cursor: pointer; color: var(--muted); }
 .dialog-foot { display: flex; align-items: center; gap: 8px; }
 .dialog-foot .muted { flex: 1; color: var(--muted); font-size: 12px; text-align: right; }
+
+/* Replay: read-only playback with a control bar under the filters. */
+.replay-bar { display: flex; align-items: center; gap: var(--gap); padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.replay-bar input[type="range"] { flex: 1; accent-color: var(--accent); }
+.replay-bar output { min-width: 11em; font-variant-numeric: tabular-nums; color: var(--muted); }
+body.replaying #replay-start, body.replaying .topbar .toggle { display: none; }
+body.replaying .card { cursor: default; }
+body.replaying .card:hover { box-shadow: var(--shadow); }
+.card.ghost { position: fixed; margin: 0; pointer-events: none; }

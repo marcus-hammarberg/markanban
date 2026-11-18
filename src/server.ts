@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyChange, newCard, parseCard, slug, type Change } from './card.ts';
-import { CONFIG_FILE, orderColumns, parseConfig, placeCard, rankOrder, setConfigColumns, typeColor } from './board.ts';
+import { CONFIG_FILE, orderColumns, parseConfig, placeCard, rankOrder, replay, setConfigColumns, typeColor } from './board.ts';
 import type { Storage } from './storage.ts';
 
 const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
@@ -193,7 +193,10 @@ export function createServer(storage: Storage, user: string) {
       };
       const cardMatch = /^\/api\/cards\/([^/]+)$/.exec(url.pathname);
 
-      if (req.method === 'GET' && url.pathname === '/api/board') return send(await board());
+      if (req.method === 'GET' && url.pathname === '/api/board') {
+        const b = await board();
+        return send({ ...b, replay: replay(b.cards, b.columns.map((c) => c.key), b.config, Date.now()) });
+      }
       if (req.method === 'GET' && url.pathname === '/api/events') {
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
         res.write(': connected\n\n');

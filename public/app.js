@@ -138,6 +138,7 @@ $('#filter-clear').addEventListener('click', () => {
 });
 
 async function load() {
+  if (replaying) return; // live updates wait until replay ends; exitReplay() loads
   try {
     board = await api('GET', '/api/board');
     render();
@@ -147,11 +148,11 @@ async function load() {
   }
 }
 
-function cardEl(card) {
-  return h('article', {
-    class: 'card',
-    'data-name': card.name,
-    'data-color': card.color, // decided by the server; CSS maps it to the theme's color
+// live = false: a read-only card for replay (no drag, no dialog, no keyboard moves).
+function cardEl(card, live = true) {
+  const attrs = { class: 'card', 'data-name': card.name, 'data-color': card.color }; // color decided by the server
+  return h('article', !live ? attrs : {
+    ...attrs,
     tabindex: '0',
     draggable: card.archived ? 'false' : 'true',
     ondragstart: (e) => {
@@ -341,6 +342,7 @@ function columnEl(col, cards) {
 }
 
 function render() {
+  if (replaying) { refreshFilters(); return renderReplay(); }
   $('#title').textContent = board.folder ? `Markanban · ${board.folder}` : 'Markanban';
   document.title = $('#title').textContent;
   $('#warnings').replaceChildren(...(board.warnings ?? []).map((w) => h('div', {}, `⚠️ ${w}`)));
@@ -477,7 +479,7 @@ dialog.addEventListener('close', () => { current = null; clearHash(); });
 
 // Show the card the hash names (archived or filtered-out cards included), or close the dialog if none.
 function syncFromHash() {
-  if (!board) return; // load() calls this once the first board has arrived
+  if (!board || replaying) return; // load() calls this once the first board has arrived; replay has no dialog
   const name = hashedCard();
   if (!name) { if (dialog.open) dialog.close(); return; }
   if (current?.name === name) return;
@@ -502,6 +504,111 @@ $('#copy-link').addEventListener('click', async (e) => {
     showError(`Could not copy. The link is ${url}`);
   }
 });
+
+// --- replay (read-only playback) -------------------------------------------
+// The server turns changelogs into steps per card (board.replay); this only plays them back.
+// The board snapshot from entering replay is kept; live updates wait until exit.
+
+const SPEED = 8 * 3600; // 8 hours of board time per second
+const DURATION = 300; // ms; a new change restarts animations from where they are, so they never lag the clock
+const calm = matchMedia('(prefers-reduced-motion: reduce)');
+const replayTime = $('#replay-time');
+let replaying = null; // { start, end, columns, steps, t, playing, frame, last, shown }
+
+// The step in force at time t (the last one at or before t), or null before the card exists.
+function stepAt(steps = [], t) {
+  let found = null;
+  for (const s of steps) { if (s.at > t) break; found = s; }
+  return found;
+}
+
+function renderReplay() {
+  const r = replaying;
+  const byColumn = new Map(r.columns.map((c) => [c.key, []]));
+  for (const card of board.cards.filter(matches)) { // board order = current rank order (ranks aren't logged)
+    const s = stepAt(r.steps[card.name], r.t);
+    if (s && !s.archived) byColumn.get(s.status)?.push(card);
+  }
+  // Current columns always show; statuses no longer in use only while they hold cards.
+  const cols = r.columns.filter((c) => c.current || byColumn.get(c.key).length);
+  const shown = JSON.stringify(cols.map((c) => [c.key, byColumn.get(c.key).map((card) => card.name)]));
+  if (shown === r.shown) return; // nothing moved this frame
+  r.shown = shown;
+
+  const old = new Map([...boardEl.querySelectorAll('.card')].map((el) => [el.dataset.name, { el, rect: el.getBoundingClientRect() }]));
+  boardEl.replaceChildren(...cols.map((col) => h('section', { class: 'column' },
+    h('div', { class: `column-head${col.key === null ? ' no-status' : ''}` },
+      h('span', { class: 'title' }, col.label), h('span', { class: 'count' }, String(byColumn.get(col.key).length))),
+    byColumn.get(col.key).map((card) => cardEl(card, false)))));
+  if (calm.matches) return;
+
+  // Moved cards slide from where they were (FLIP), new ones fade in, gone ones fade out.
+  for (const el of boardEl.querySelectorAll('.card')) {
+    const was = old.get(el.dataset.name);
+    old.delete(el.dataset.name);
+    if (!was) { el.animate([{ opacity: 0 }, { opacity: 1 }], DURATION); continue; }
+    const now = el.getBoundingClientRect();
+    const dx = was.rect.left - now.left;
+    const dy = was.rect.top - now.top;
+    if (dx || dy) el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: DURATION, easing: 'ease-in-out' });
+  }
+  for (const { el, rect } of old.values()) {
+    const ghost = el.cloneNode(true);
+    ghost.classList.add('ghost');
+    Object.assign(ghost.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px` });
+    document.body.append(ghost);
+    ghost.animate([{ opacity: 1 }, { opacity: 0 }], DURATION).onfinish = () => ghost.remove();
+  }
+}
+
+function showReplayTime() {
+  replayTime.value = replaying.t;
+  $('#replay-clock').textContent = new Date(replaying.t).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  $('#replay-play').textContent = replaying.playing ? '❚❚ Pause' : '▶ Play';
+  renderReplay();
+}
+
+function tick(now) {
+  const r = replaying;
+  r.t = Math.min(r.end, r.t + (now - r.last) * SPEED);
+  r.last = now;
+  if (r.t >= r.end) r.playing = false;
+  else r.frame = requestAnimationFrame(tick);
+  showReplayTime();
+}
+
+function setPlaying(on) {
+  const r = replaying;
+  cancelAnimationFrame(r.frame);
+  r.playing = on;
+  if (on) {
+    if (r.t >= r.end) r.t = r.start; // play again from the beginning
+    r.last = performance.now();
+    r.frame = requestAnimationFrame(tick);
+  }
+  showReplayTime();
+}
+
+function exitReplay() {
+  cancelAnimationFrame(replaying.frame);
+  replaying = null;
+  document.body.classList.remove('replaying');
+  $('#replay-bar').hidden = true;
+  load();
+}
+
+$('#replay-start').addEventListener('click', () => {
+  if (!board || replaying) return;
+  replaying = { ...board.replay, t: board.replay.start, playing: false, shown: null };
+  replayTime.min = replaying.start;
+  replayTime.max = replaying.end;
+  document.body.classList.add('replaying');
+  $('#replay-bar').hidden = false;
+  setPlaying(true);
+});
+$('#replay-play').addEventListener('click', () => setPlaying(!replaying.playing));
+replayTime.addEventListener('input', () => { replaying.t = Number(replayTime.value); showReplayTime(); });
+$('#replay-exit').addEventListener('click', exitReplay);
 
 // --- live updates ----------------------------------------------------------
 

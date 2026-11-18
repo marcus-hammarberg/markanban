@@ -20,6 +20,7 @@
   <header class="topbar">
     <h1 id="title">Markanban</h1>
     <label class="toggle"><input type="checkbox" id="show-archived"> Show archived</label>
+    <button id="replay-start" title="Play back how cards moved over time">▶ Replay</button>
     <button id="theme" title="Theme"></button>
   </header>
   <div id="error" class="error" hidden></div>
@@ -30,6 +31,12 @@
     <select id="filter-assignee" aria-label="Filter by assignee"></select>
     <select id="filter-tag" aria-label="Filter by tag"></select>
     <button id="filter-clear" hidden>Clear</button>
+  </div>
+  <div id="replay-bar" class="replay-bar" hidden>
+    <button id="replay-play" class="primary"></button>
+    <input type="range" id="replay-time" step="any" aria-label="Replay time">
+    <output id="replay-clock" for="replay-time"></output>
+    <button id="replay-exit">Exit replay</button>
   </div>
   <main id="board" class="board"></main>
 

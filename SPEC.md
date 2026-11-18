@@ -1,7 +1,3 @@
----
-rank: 1000
-created: 2026-11-17T08:14:24Z
----
 # Markanban — v1 Spec
 
 A kanban board driven by a folder of markdown files. Point it at a folder and you're done.
@@ -229,6 +225,38 @@ Cards are color-coded by `type`: a 4px stripe on the left edge plus a tinted typ
 - Colors are changed only via config or defaults, never in the UI.
 - An unknown color name skips that entry (falls back to the built-in color, if any) and shows a warning listing the valid colors.
 
+### Replay
+
+A separate, read-only mode that plays back how cards moved across the board over time.
+
+**Modes**
+- Normal board: unchanged, plus one "▶ Replay" button in the header. No replay controls are visible.
+- Replay mode: entered via that button. Board is read-only (no drag, no `+` buttons, no "+ Column", no card dialog, no "Show archived"; `#card=` links are ignored), live file updates are held until exit. The filter row stays, so you can replay a subset (e.g. one assignee). A control bar appears: play/pause, timeline slider, replayed date/time clock, Exit.
+- Exit returns to the live board (loading any held updates) and removes the control bar.
+
+**Playback**
+- Starts at the beginning and plays at a fixed **8 hours per second**. No speed selector: drag the timeline slider to go faster, slower or backwards. Stops at the end; Play again restarts from the beginning.
+- The timeline runs from the earliest event to the moment the board was loaded.
+
+**Data (no extra file reads, no file changes)**
+- The server builds the timeline from the changelogs it already reads (`replay()` in `src/board.ts`, tested) and returns it as `replay` in `/api/board`: `{ start, end, columns, steps }`. `steps[<file name>]` is a list of `{ at, status, archived }` (`at` in ms), each in force from `at` until the next. The browser only plays it back.
+- A card appears at its earliest known time: `card: created` line → `created` field → file birthtime (or its first logged change, if earlier).
+- Its starting column is the `from` of its first status change, else its current status.
+- `archived` hides it; unarchive brings it back.
+- Lines with an unreadable timestamp are skipped; out-of-order lines are sorted by time.
+- Other field changes are not replayed; cards show their current heading and fields.
+
+**Board**
+- `columns` lists every status the timeline uses, plus the current columns, ordered by the normal column rules ("No status" first). Current columns always show; statuses no longer in use appear only while they hold cards.
+- Only active cards are shown; archived ones are hidden.
+- Moving cards slide between columns (Web Animations API, no dependency). New cards fade in, archived fade out. A new change restarts animations from wherever the cards are, so they never lag the clock. No animation when the OS asks for reduced motion.
+
+**Card order**
+- Ranks aren't logged, so order changes can't be replayed; cards in a replayed column are shown in their current order.
+
+**Known gap (accepted)**
+- Edits made outside the UI aren't in the changelog, so such a card jumps to its current state at the end. Replay is only as complete as the changelog.
+
 ## Tech
 
 - TypeScript on Node 22+, published as compiled JS (runs via `npx`).
@@ -260,37 +288,3 @@ Sharing a board = putting the folder in a sync client's folder (Google Drive for
 - Hand-drawn theme; board-level default theme in `.markanban.yml`
 - `.markanban.yml` in the run folder pointing at a board folder
 - Editing unknown fields in the UI
-
-## Proposed: Replay (decided — not built yet)
-
-A separate, read-only mode that plays back how cards moved across the board over time.
-
-**Modes**
-- Normal board: unchanged, plus one "▶ Replay" button in the header. No replay controls are visible.
-- Replay mode: entered via that button. Board is read-only (no drag, no `+` buttons, no "+ Column", no card dialog), live file updates are held until exit. The filter row stays, so you can replay a subset (e.g. one assignee). A control bar appears: play/pause, timeline slider, replayed date/time clock, Exit.
-- Exit returns to the live board and removes the control bar.
-
-**Playback**
-- Play runs at a fixed **8 hours per second**. No speed selector: drag the timeline slider to go faster, slower or backwards.
-- The timeline runs from the earliest event to now.
-
-**Data (client-side only, no server or file changes)**
-- Rebuilt from the changelogs already returned by `/api/board`; no extra file reads.
-- A card appears at its earliest known time: `card: created` line → `created` field → file birthtime.
-- Its starting column is the `from` of its first status change, else its current status.
-- `archived` hides it; unarchive brings it back.
-- Other field changes are not replayed; cards show their current heading and fields.
-- If building the timeline is ever noticeably slow, show a "Preparing replay…" loading state.
-
-**Board**
-- Statuses no longer in use appear as a column only while they hold cards, ordered by the normal column rules.
-- Moving cards slide between columns (Web Animations API, no dependency). New cards fade in, archived fade out. Animations are cut short at high speed so they never lag the clock.
-
-**Card order**
-- Ranks aren't logged, so order changes can't be replayed; cards in a replayed column are shown in their current order. Revisit these decisions when building replay.
-
-**Known gap (accepted)**
-- Edits made outside the UI aren't in the changelog, so such a card jumps to its current column at the end. Replay is only as complete as the changelog.
-- 2026-11-17T13:41:26Z marcushammarberg status: (none) → Demo
-- 2026-11-17T13:41:34Z marcushammarberg status: Demo → Done
-- 2026-11-17T13:41:35Z marcushammarberg status: Done → (none)

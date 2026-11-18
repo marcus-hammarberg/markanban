@@ -156,3 +156,57 @@ export function placeCard(column: Rankable[], before: string | null): { rank: nu
   }
   return { rank, updates: [...updates].map(([name, r]) => ({ name, rank: r })) };
 }
+
+// ---- Replay: how cards moved over time, rebuilt from their changelogs ----
+
+export interface Step { at: number; status: string | null; archived: boolean } // state from `at` (ms) on
+export interface ReplayCard { name: string; status: string | null; archived: string | null; created: string; history: string[] }
+
+const CHANGE = /^(\S+) .+? (status|archived): (.*?) → (.*)$/;
+const CREATED = /^(\S+) .+? card: created$/;
+const logValue = (v: string) => (v === '(none)' ? null : v);
+
+/**
+ * A card's states over time. It appears at `card: created` (else `created`, which is the file
+ * birthtime when missing), in the `from` of its first status change. Only status and archive are
+ * replayed. If the log doesn't end in the card's current state (edited outside the UI), it
+ * jumps there at `end`.
+ */
+function cardSteps(card: ReplayCard, end: number): Step[] {
+  let appear = Date.parse(card.created);
+  const changes: { at: number; field: string; from: string | null; to: string | null }[] = [];
+  for (const line of card.history) {
+    const m = CHANGE.exec(line);
+    const at = Date.parse((m ?? CREATED.exec(line))?.[1] ?? '');
+    if (Number.isNaN(at)) continue;
+    if (m) changes.push({ at, field: m[2], from: logValue(m[3]), to: logValue(m[4]) });
+    else appear = at;
+  }
+  changes.sort((a, b) => a.at - b.at);
+  const first = (field: string) => changes.find((c) => c.field === field);
+  let state = { status: first('status') ? first('status')!.from : card.status, archived: first('archived')?.from != null };
+  const start = Math.min(Number.isNaN(appear) ? end : appear, changes[0]?.at ?? end);
+  const steps: Step[] = [{ at: start, ...state }];
+  for (const c of changes) {
+    state = c.field === 'status' ? { ...state, status: c.to } : { ...state, archived: c.to !== null };
+    steps.push({ at: c.at, ...state });
+  }
+  const now = { status: card.status, archived: card.archived !== null };
+  if (state.status !== now.status || state.archived !== now.archived) steps.push({ at: end, ...now });
+  return steps;
+}
+
+/** Everything the browser needs to play the board back from the first event to `end`. */
+export function replay(cards: ReplayCard[], current: (string | null)[], config: { columns: string[]; noStatusColumn: string }, end: number) {
+  const steps = Object.fromEntries(cards.map((c) => [c.name, cardSteps(c, end)]));
+  const all = Object.values(steps).flat();
+  const statuses = all.flatMap((s) => (s.status === null ? [] : [s.status]));
+  const keys: (string | null)[] = orderColumns([...statuses, ...current.filter((k) => k !== null)], config.columns);
+  if (current.includes(null) || all.some((s) => s.status === null)) keys.unshift(null);
+  return {
+    start: Math.min(end, ...all.map((s) => s.at)),
+    end,
+    columns: keys.map((key) => ({ key, label: key ?? config.noStatusColumn, current: current.includes(key) })),
+    steps,
+  };
+}

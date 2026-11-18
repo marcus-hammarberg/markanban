@@ -76,6 +76,7 @@ To change the order, drag a column by its header (⠿), or hover over the header
 - **Comment** in the Comments section at the bottom of the card (collapsed until you open it, with the number of comments shown). Comments are saved in the card file.
 - **Archive** cards you're done with. They disappear from the board; tick **Show archived** to see them again and unarchive. There's no delete button: to remove a card for good, delete its file.
 - **Filter** with the row above the board: search text (headings, card text and comments), or pick a type, assignee or tag.
+- **Replay** shows how the board got here: **▶ Replay** in the top right plays back how cards moved between columns, 8 hours per second. Drag the slider to jump around, and use the filters to follow one person or tag. The board is read-only while replaying; **Exit replay** brings back the live board.
 - **Theme**: the board follows your system's light or dark mode. The button in the top right switches between System, Light and Dark.
 
 ## History and comments
@@ -156,7 +157,7 @@ Markanban only accepts connections from your own computer; it isn't reachable fr
 
 - Swimlanes, attachments and a hosted version aren't there yet.
 - Card text and comments are shown as plain text; markdown isn't rendered yet.
-- Changes made outside the board (in an editor or by sync) aren't recorded in the history.
+- Changes made outside the board (in an editor or by sync) aren't recorded in the history, so Replay can't show them: such a card jumps to where it is now at the end.
 - A card file Markanban can't read (for example, no permission) is left out and a warning names it.
 
 ## Contributing
