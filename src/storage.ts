@@ -1,5 +1,5 @@
 // The only module that touches the filesystem. Swap this for Drive/hosted storage later.
-import fs from 'node:fs';
+import fs, { type Dirent } from 'node:fs';
 import { mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { CONFIG_FILE } from './board.ts';
@@ -10,8 +10,40 @@ export function isCardName(name: string) {
   return /\.md$/i.test(name) && !name.startsWith('.') && name.toLowerCase() !== 'readme.md';
 }
 
-/** The folder that holds a card's attachments: `fix-bug.md` → `fix-bug`. */
+/** The folder that holds a card's attachments: `fix-bug.md` → `fix-bug`, `frontend/b.md` → `frontend/b`. */
 const folderOf = (card: string) => card.replace(/\.md$/i, '');
+
+const isVisibleDir = (e: Dirent) => e.isDirectory() && !e.name.startsWith('.');
+
+/**
+ * Where the cards are: top-level cards, lane cards (one folder down) and the attachment folders that exist.
+ * A folder next to a same-named card holds its attachments; any other folder with cards in it is a lane.
+ */
+async function scan(dir: string) {
+  const top = await readdir(dir, { withFileTypes: true });
+  const cards = top.filter((e) => e.isFile() && isCardName(e.name)).map((e) => e.name);
+  const owned = new Set(cards.map(folderOf));
+  const folders: string[] = [];
+  const warnings: string[] = [];
+  await Promise.all(top.filter(isVisibleDir).map(async (d) => {
+    const inner = await readdir(path.join(dir, d.name), { withFileTypes: true }).catch(() => [] as Dirent[]);
+    const laneCards = inner.filter((e) => e.isFile() && isCardName(e.name)).map((e) => e.name);
+    if (owned.has(d.name)) {
+      folders.push(d.name);
+      if (laneCards.length) warnings.push(`${d.name}/ is the attachment folder of ${d.name}.md, so the cards in it are not shown as a lane. Rename one of them if it should be a lane.`);
+      return;
+    }
+    if (!laneCards.length) return; // images/, an orphan attachment folder: not a lane
+    cards.push(...laneCards.map((n) => `${d.name}/${n}`));
+    const laneOwned = new Set(laneCards.map(folderOf));
+    await Promise.all(inner.filter(isVisibleDir).map(async (sub) => {
+      if (laneOwned.has(sub.name)) return void folders.push(`${d.name}/${sub.name}`);
+      const deeper = await readdir(path.join(dir, d.name, sub.name)).catch(() => [] as string[]);
+      if (deeper.some(isCardName)) warnings.push(`Cards in ${d.name}/${sub.name}/ are not shown: lanes are one folder deep.`);
+    }));
+  }));
+  return { cards, folders, warnings };
+}
 
 /** An uploaded file's name, safe to use as one path segment: the original name minus paths and unsafe characters. */
 export function attachmentName(name: string) {
@@ -26,19 +58,24 @@ const invalid = (name: string) => Object.assign(new Error(`Invalid file name: ${
 export function createStorage(root: string) {
   const dir = path.resolve(root);
 
-  // Only top-level card files and the config file are reachable. Blocks ../ and subfolders.
-  const resolve = (name: string) => {
+  // A card is `<card>.md` or `<lane>/<card>.md`: plain visible names, nothing deeper, no ../ or \.
+  const cardPath = (name: string) => {
+    const parts = name.split('/');
+    const plain = (p: string) => p !== '' && !p.startsWith('.') && !/[\\\u0000-\u001f]/.test(p);
+    if (parts.length > 2 || !parts.every(plain) || !isCardName(parts[parts.length - 1])) throw invalid(name);
     const full = path.join(dir, name);
-    if ((name !== CONFIG_FILE && !isCardName(name)) || path.dirname(full) !== dir || path.basename(full) !== name) {
-      throw Object.assign(new Error(`Invalid file name: ${name}`), { status: 400 });
-    }
+    if (path.relative(dir, full) !== path.join(...parts)) throw invalid(name);
     return full;
   };
+  const resolve = (name: string) => (name === CONFIG_FILE ? path.join(dir, name) : cardPath(name));
+  const exists = (p: string) => stat(p).then(() => true, (e) => {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw e;
+  });
 
-  // <card folder>/<file>: one level, the card must be a card name, the file a plain visible name.
+  // [<lane>/]<card folder>/<file>: the card must be a card path, the file a plain visible name.
   const attachmentPath = (card: string, file?: string) => {
-    if (!isCardName(card) || path.basename(card) !== card) throw invalid(card);
-    const folder = path.join(dir, folderOf(card));
+    const folder = cardPath(card).replace(/\.md$/i, '');
     if (file === undefined) return folder;
     if (file.startsWith('.') || path.basename(file) !== file || /[\\/]/.test(file)) throw invalid(file);
     return path.join(folder, file);
@@ -48,9 +85,8 @@ export function createStorage(root: string) {
     dir,
 
     /** One unreadable file never fails the listing: it is reported in `unreadable` instead. */
-    async list(): Promise<{ files: StoredFile[]; unreadable: { name: string; message: string }[] }> {
-      const entries = await readdir(dir, { withFileTypes: true });
-      const names = entries.filter((e) => e.isFile() && isCardName(e.name)).map((e) => e.name);
+    async list(): Promise<{ files: StoredFile[]; unreadable: { name: string; message: string }[]; warnings: string[] }> {
+      const { cards: names, warnings } = await scan(dir);
       const files: StoredFile[] = [];
       const unreadable: { name: string; message: string }[] = [];
       await Promise.all(names.map(async (name) => {
@@ -63,7 +99,7 @@ export function createStorage(root: string) {
           if ((e as NodeJS.ErrnoException).code !== 'ENOENT') unreadable.push({ name, message: (e as Error).message });
         }
       }));
-      return { files, unreadable };
+      return { files, unreadable, warnings };
     },
 
     async read(name: string): Promise<string | null> {
@@ -79,9 +115,31 @@ export function createStorage(root: string) {
     async write(name: string, text: string, opts: { create?: boolean } = {}) {
       const full = resolve(name);
       if (opts.create) return writeFile(full, text, { flag: 'wx' });
-      const tmp = path.join(dir, `.${name}.${process.pid}.tmp`);
+      const tmp = path.join(path.dirname(full), `.${path.basename(full)}.${process.pid}.tmp`);
       await writeFile(tmp, text);
       await rename(tmp, full);
+    },
+
+    /**
+     * Moves a card to another lane (or the top level), its attachment folder first. Refused (409) when the
+     * target already has a card file or folder of that name: nothing is ever overwritten or renamed to fit.
+     */
+    async move(from: string, to: string) {
+      const [src, dst] = [cardPath(from), cardPath(to)];
+      const [srcFolder, dstFolder] = [src, dst].map((p) => p.replace(/\.md$/i, ''));
+      const where = to.includes('/') ? to.split('/')[0] : 'The top level';
+      const base = path.basename(dst);
+      if (await exists(dst)) throw Object.assign(new Error(`${where} already has ${base}`), { status: 409 });
+      if (await exists(dstFolder)) throw Object.assign(new Error(`${where} already has a folder ${path.basename(dstFolder)}`), { status: 409 });
+      // ponytail: check-then-rename; a file a sync client creates at `dst` in between would be replaced. Use link+unlink if that ever shows up.
+      const hasFolder = await exists(srcFolder);
+      if (hasFolder) await rename(srcFolder, dstFolder);
+      try {
+        await rename(src, dst);
+      } catch (e) {
+        if (hasFolder) await rename(dstFolder, srcFolder).catch(() => {}); // keep the attachments with their card
+        throw e;
+      }
     },
 
     /** A card's attachments: visible files in its folder, sorted. No folder means none. */
@@ -148,8 +206,9 @@ export function createStorage(root: string) {
         clearTimeout(timer);
         timer = setTimeout(onChange, 100);
       };
-      const w = fs.watch(dir, (_event, file) => {
-        if (file && file.startsWith('.') && file !== CONFIG_FILE) return;
+      // Recursive, so lane folders are watched too; polling catches whatever this misses.
+      const w = fs.watch(dir, { recursive: true }, (_event, file) => {
+        if (file && file !== CONFIG_FILE && file.split(path.sep).some((part) => part.startsWith('.'))) return;
         changed();
       });
       const stopPolling = pollFolder(dir, 3000, changed);
@@ -168,14 +227,13 @@ export function pollFolder(dir: string, ms: number, onChange: () => void) {
   let stopped = false;
   const tick = async () => {
     try {
-      const top = (await readdir(dir)).filter((n) => n === CONFIG_FILE || isCardName(n));
+      const { cards, folders } = await scan(dir);
       // Attachments: the visible files in each card's folder (most cards have none).
-      const inFolders = await Promise.all(top.filter(isCardName).map(async (card) => {
-        const folder = folderOf(card);
+      const inFolders = await Promise.all(folders.map(async (folder) => {
         const files = await readdir(path.join(dir, folder)).catch(() => [] as string[]);
         return files.filter((f) => !f.startsWith('.')).map((f) => `${folder}/${f}`);
       }));
-      const names = [...top, ...inFolders.flat()].sort();
+      const names = [CONFIG_FILE, ...cards, ...inFolders.flat()].sort();
       const parts = await Promise.all(names.map(async (n) => {
         const st = await stat(path.join(dir, n)).catch(() => null); // vanished mid-look: next tick sees it
         return st ? `${n}:${st.size}:${st.mtimeMs}` : '';

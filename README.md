@@ -27,7 +27,7 @@ A new, empty board shows only **+ Column**. Click it to add your first column (f
 
 ## Cards
 
-A card is any `.md` file directly in the folder. `README.md`, hidden files and subfolders are ignored (except a card's attachments folder, see [Attachments](#attachments)). A file doesn't need anything special to be a card:
+A card is any `.md` file directly in the folder, or in a lane folder (see [Swimlanes](#swimlanes)). `README.md` and hidden files are ignored. A file doesn't need anything special to be a card:
 
 ```markdown
 Just an idea I had.
@@ -65,6 +65,29 @@ Any other field (like `priority` above) is kept as-is and shown as a small label
 Columns come from the statuses on your cards, so a new status gives you a new column. They're ordered the way you'd expect (`backlog`, `todo`, `ready`, `doing`, `in progress`, `review`, `done`), with any others after them alphabetically.
 
 To change the order, drag a column by its header (⠿), or hover over the header and use the ‹ › buttons. Your order is saved in `.markanban.yml`, and columns listed there stay visible even when they're empty. A column also stays when you move or archive its last card on the board. Use **+ Column** to add a new one, or drop a card on it to give the card a new status.
+
+## Swimlanes
+
+Swimlanes are rows across the board, one per folder, all sharing the same columns. To add one, create a folder in the board folder and put (or move) a card file into it:
+
+```text
+team-board/
+  triage-inbox.md        ← top row, without a header
+  1 Frontend/
+    login-button.md      ← the "1 Frontend" lane
+  2 Backend/
+    rate-limit.md
+```
+
+- A folder is a lane as long as it holds at least one card. Empty folders and folders without cards (`images/`, say) don't show.
+- A folder next to a card with the same name (`login-button/` next to `login-button.md`) holds that card's [attachments](#attachments), so it isn't a lane.
+- Lanes are sorted by name. Put a number in front (`1 Frontend`, `2 Backend`) to choose the order.
+- Lanes are one folder deep: folders inside a lane aren't lanes, and a warning tells you if cards are hiding there.
+- Drag a card into another lane to move it there; its file and attachments move along, and the history records `lane: 1 Frontend → 2 Backend`. With the keyboard, Alt+↑/↓ past the top or bottom of a lane moves the card into the lane above or below. A card can't move into a lane that already has a file with the same name.
+- Click a lane's name to collapse it to one line (click again to open it). Each person's collapsed lanes are remembered in their own browser.
+- New cards from **+** start in the top row. Board links to a card keep working after it moves to another lane.
+
+Lanes are made and renamed in Finder or Explorer, not on the board. Boards without folders look exactly as before.
 
 ## Working with cards
 
@@ -166,7 +189,8 @@ Markanban only accepts connections from your own computer; it isn't reachable fr
 
 ## Limitations
 
-- Swimlanes and a hosted version aren't there yet.
+- A hosted version isn't there yet.
+- Replay shows every card in the lane it's in now; moves between lanes aren't replayed.
 - Card text and comments are shown as plain text; markdown isn't rendered yet.
 - Changes made outside the board (in an editor or by sync) aren't recorded in the history, so Replay can't show them: such a card jumps to where it is now at the end.
 - A card file Markanban can't read (for example, no permission) is left out and a warning names it.
@@ -181,7 +205,7 @@ npm test
 npm start -- ./some-board
 ```
 
-To see Replay in action, generate a demo board: the story of how Markanban itself was built, about 20 cards dated over the last three weeks.
+To see Replay in action, generate a demo board: the story of how Markanban itself was built, about 20 cards dated over the last three weeks and sorted into three [swimlanes](#swimlanes).
 
 ```sh
 npm run demo -- ./demo-board   # needs a new or empty folder

@@ -188,22 +188,91 @@ function cardEl(card, live = true) {
 // Card order: the browser only says where a card goes ("above card X" or the bottom, before = null);
 // the server works out ranks and returns the cards in order.
 let draggingCard = null; // drag data can't be read during dragover, so remember the name
+let refocus = null; // a card moved to another lane gets a new name; keep keyboard focus on it
 
-function moveCard(name, status, before) {
+// lane: undefined keeps the card's lane; a lane name or null (the top level) moves the file there.
+function moveCard(name, status, before, lane) {
   const card = board.cards.find((c) => c.name === name);
   if (!card) return;
   const sameColumn = (card.status ?? null) === status;
-  if (sameColumn) {
+  const sameLane = lane === undefined || lane === card.lane;
+  if (sameColumn && sameLane) {
     // Dropped where it already is: nothing to do.
-    const names = [...document.querySelectorAll('.card')].filter((el) => el.closest('.column') === cardColumn(name)).map((el) => el.dataset.name);
+    const names = [...cardCell(name).querySelectorAll('.card')].map((el) => el.dataset.name);
     if ((names[names.indexOf(name) + 1] ?? null) === before) return;
   }
   const body = { place: { before } };
   if (!sameColumn) body.fields = { status: status ?? '' };
-  act(() => api('PATCH', `/api/cards/${encodeURIComponent(name)}`, body));
+  if (!sameLane) body.lane = lane;
+  const focused = document.activeElement?.dataset?.name === name;
+  act(async () => {
+    const moved = (await api('PATCH', `/api/cards/${encodeURIComponent(name)}`, body)).name;
+    if (focused && moved !== name) refocus = moved;
+  });
 }
 
-const cardColumn = (name) => document.querySelector(`.card[data-name="${CSS.escape(name)}"]`)?.closest('.column');
+// The cards a card sits among: its lane's cell in a column, or the whole column on a board without lanes.
+const cardCell = (name) => document.querySelector(`.card[data-name="${CSS.escape(name)}"]`)?.closest('.cell, .column');
+
+// --- swimlanes: lane folders as rows that share the columns (see SPEC.md) -----
+
+const hasLanes = () => board.lanes.some((l) => l !== null);
+
+// Collapsed lanes are a per-person view setting, kept in this browser only (never in the board folder).
+const collapsedKey = () => `markanban-collapsed:${board.folder}`;
+const collapsedLanes = () => { try { return JSON.parse(store.get(collapsedKey())) ?? []; } catch { return []; } };
+const isCollapsed = (lane) => lane !== null && collapsedLanes().includes(lane);
+function toggleLane(lane) {
+  const rest = collapsedLanes().filter((l) => l !== lane);
+  store.set(collapsedKey(), JSON.stringify(isCollapsed(lane) ? rest : [...rest, lane]));
+  if (replaying) replaying.shown = null; // force a redraw even though no card moved
+  render();
+}
+
+// The open lane above (-1) or below (+1); the top level counts as the first lane even while it isn't shown.
+function neighbourLane(lane, step) {
+  const order = [null, ...board.lanes.filter((l) => l !== null)];
+  let i = order.indexOf(lane) + step;
+  while (isCollapsed(order[i])) i += step;
+  return order[i];
+}
+
+// One cell per lane in a column. A named lane also gets an empty row where its full-width header sits.
+// A collapsed lane's cell only shows how many cards it holds, and still takes dropped cards (at the bottom).
+function laneCells(cards, live, onCell) {
+  return board.lanes.flatMap((lane) => {
+    const here = cards.filter((c) => c.lane === lane);
+    const cell = isCollapsed(lane)
+      ? h('div', { class: 'cell collapsed' }, here.length > 0 && h('span', { class: 'folded' }, `${here.length} card${here.length > 1 ? 's' : ''}`))
+      : h('div', { class: 'cell' }, here.map((c) => cardEl(c, live)));
+    onCell?.(cell, lane);
+    return lane === null ? [cell] : [h('div', { class: 'lane-gap', 'aria-hidden': 'true' }), cell];
+  });
+}
+
+// Columns line their cells up across the board (CSS subgrid); lane headers span every column. Each column
+// gets its grid column explicitly, otherwise the headers (placed first) push the columns off to the side.
+function laneHeads(columnEls, cards) {
+  boardEl.classList.toggle('lanes', hasLanes());
+  boardEl.style.gridTemplateRows = boardEl.style.gridTemplateColumns = '';
+  if (!hasLanes()) return [];
+  columnEls.forEach((el, i) => { el.style.gridColumn = String(i + 1); });
+  let row = 2; // row 1 holds the column headers
+  const heads = [];
+  for (const lane of board.lanes) {
+    if (lane !== null) {
+      const folded = isCollapsed(lane);
+      heads.push(h('div', { class: 'lane-head', style: `grid-row: ${row++}` },
+        h('button', { class: 'lane-toggle', 'aria-expanded': String(!folded), title: folded ? 'Show this lane' : 'Collapse this lane', onclick: () => toggleLane(lane) },
+          h('span', { class: 'chevron', 'aria-hidden': 'true' }, folded ? '▸' : '▾'),
+          h('span', { class: 'title' }, lane), h('span', { class: 'count' }, String(cards.filter((c) => c.lane === lane).length)))));
+    }
+    row++;
+  }
+  boardEl.style.gridTemplateRows = `repeat(${row - 1}, auto)`;
+  boardEl.style.gridTemplateColumns = `repeat(${columnEls.length}, var(--column-width))`;
+  return heads;
+}
 
 // The visible card the dragged card would land above, or null for the bottom of the column.
 function insertionPoint(columnEl, y) {
@@ -245,21 +314,30 @@ function dropZone(el, onCard, positioned = false) {
   });
 }
 
-// Keyboard: Enter opens; Alt+↑/↓ moves within the column; Alt+←/→ moves to the bottom of the next column.
+// Keyboard: Enter opens; Alt+↑/↓ moves within the cell, and past its edge into the next lane (top of the
+// lane below, bottom of the lane above, so the opposite key undoes it); Alt+←/→ moves to the bottom of the next column.
 function cardKeys(e, card) {
   if (e.target !== e.currentTarget) return;
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCard(card); return; }
   if (!e.altKey || card.archived) return;
-  const names = [...e.currentTarget.closest('.column').querySelectorAll('.card')].map((el) => el.dataset.name);
+  const names = [...e.currentTarget.closest('.cell, .column').querySelectorAll('.card')].map((el) => el.dataset.name);
   const i = names.indexOf(card.name);
   let status = card.status ?? null;
   let before;
+  let lane;
   if (e.key === 'ArrowUp') {
-    if (i <= 0) return;
-    before = names[i - 1];
+    if (i <= 0) {
+      lane = hasLanes() ? neighbourLane(card.lane, -1) : undefined;
+      if (lane === undefined) return;
+      before = null;
+    } else before = names[i - 1];
   } else if (e.key === 'ArrowDown') {
-    if (i === names.length - 1) return;
-    before = names[i + 2] ?? null;
+    if (i === names.length - 1) {
+      lane = hasLanes() ? neighbourLane(card.lane, 1) : undefined;
+      if (lane === undefined) return;
+      // Above the first visible card of that lane's cell (board.cards is in rank order).
+      before = board.cards.find((c) => !c.archived && matches(c) && c.lane === lane && (c.status ?? null) === status)?.name ?? null;
+    } else before = names[i + 2] ?? null;
   } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
     const keys = board.columns.map((c) => c.key);
     const j = keys.indexOf(status) + (e.key === 'ArrowLeft' ? -1 : 1);
@@ -268,7 +346,7 @@ function cardKeys(e, card) {
     before = null;
   } else return;
   e.preventDefault();
-  moveCard(card.name, status, before);
+  moveCard(card.name, status, before, lane);
 }
 
 function saveColumnOrder(order) {
@@ -339,8 +417,11 @@ function columnEl(col, cards) {
       if (heading?.trim()) act(() => api('POST', '/api/cards', { heading, status: col.key }));
     },
   }, '+'));
-  const el = h('section', { class: 'column' }, head, cards.map((c) => cardEl(c)));
-  dropZone(el, (name, before) => moveCard(name, col.key, before), true);
+  const lanes = hasLanes();
+  const el = h('section', { class: 'column' }, head, lanes
+    ? laneCells(cards, true, (cell, lane) => dropZone(cell, (name, before) => moveCard(name, col.key, before, lane), true))
+    : cards.map((c) => cardEl(c)));
+  if (!lanes) dropZone(el, (name, before) => moveCard(name, col.key, before), true);
   if (movable) columnDropZone(el, col.key);
   return el;
 }
@@ -376,8 +457,10 @@ function render() {
     archived.map((c) => cardEl(c))) : null;
 
   // Every redraw (own actions and live updates) keeps keyboard focus on the same card.
-  const focused = document.activeElement?.closest?.('#board .card')?.dataset.name;
-  boardEl.replaceChildren(...cols, newCol, ...(archivedCol ? [archivedCol] : []));
+  const focused = refocus ?? document.activeElement?.closest?.('#board .card')?.dataset.name;
+  refocus = null;
+  const columnEls = [...cols, newCol, ...(archivedCol ? [archivedCol] : [])];
+  boardEl.replaceChildren(...columnEls, ...laneHeads(columnEls, active));
   if (focused) boardEl.querySelector(`.card[data-name="${CSS.escape(focused)}"]`)?.focus();
 }
 
@@ -544,8 +627,16 @@ function syncFromHash() {
   const name = hashedCard();
   if (!name) { if (dialog.open) dialog.close(); return; }
   if (current?.name === name) return;
-  const card = board.cards.find((c) => c.name === name);
-  if (card) { showError(''); return showCard(card); }
+  // After a lane move the path is new but the file name isn't: open the one card with that file name.
+  const file = (n) => n.split('/').pop();
+  const sameFile = board.cards.filter((c) => file(c.name) === file(name));
+  const card = board.cards.find((c) => c.name === name) ?? (sameFile.length === 1 ? sameFile[0] : null);
+  if (card) {
+    showError('');
+    if (card.name !== name) history.replaceState(null, '', cardHash(card.name));
+    if (current?.name === card.name) return;
+    return showCard(card);
+  }
   showError(`No card ${name}`);
   clearHash();
 }
@@ -597,10 +688,12 @@ function renderReplay() {
   r.shown = shown;
 
   const old = new Map([...boardEl.querySelectorAll('.card')].map((el) => [el.dataset.name, { el, rect: el.getBoundingClientRect() }]));
-  boardEl.replaceChildren(...cols.map((col) => h('section', { class: 'column' },
+  // Cards stay in their current lane: lane moves aren't replayed.
+  const columnEls = cols.map((col) => h('section', { class: 'column' },
     h('div', { class: `column-head${col.key === null ? ' no-status' : ''}` },
       h('span', { class: 'title' }, col.label), h('span', { class: 'count' }, String(byColumn.get(col.key).length))),
-    byColumn.get(col.key).map((card) => cardEl(card, false)))));
+    hasLanes() ? laneCells(byColumn.get(col.key), false) : byColumn.get(col.key).map((card) => cardEl(card, false))));
+  boardEl.replaceChildren(...columnEls, ...laneHeads(columnEls, cols.flatMap((col) => byColumn.get(col.key))));
   if (calm.matches) return;
 
   // Moved cards slide from where they were (FLIP), new ones fade in, gone ones fade out.

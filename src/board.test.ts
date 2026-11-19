@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { orderColumns, parseConfig, placeCard, rankOrder, replay, setConfigColumns, typeColor } from './board.ts';
+import { orderColumns, orderLanes, parseConfig, placeCard, rankOrder, replay, setConfigColumns, typeColor } from './board.ts';
 
 test('common order first, then alphabetical', () => {
   assert.deepEqual(orderColumns(['zeta', 'Done', 'alpha', 'todo', 'In Progress'], []), ['todo', 'In Progress', 'Done', 'alpha', 'zeta']);
@@ -168,4 +168,11 @@ test('replay: columns cover every status ever used, in normal column order, no s
     { key: 'done', label: 'done', current: false },
     { key: 'zeta', label: 'zeta', current: false },
   ]);
+});
+
+test('lanes: top level first (only with active cards), then folders in natural order', () => {
+  const card = (name: string, archived: string | null = null) => ({ lane: name.includes('/') ? name.split('/')[0] : null, archived });
+  assert.deepEqual(orderLanes([card('b.md'), card('lane 10/a.md'), card('Lane 2/a.md'), card('alpha/x.md', 'T')]), [null, 'alpha', 'Lane 2', 'lane 10']);
+  assert.deepEqual(orderLanes([card('b.md', 'T'), card('x/a.md')]), ['x'], 'archived top-level cards show no unnamed lane');
+  assert.deepEqual(orderLanes([card('b.md'), card('c.md')]), [null], 'no folders: one unnamed lane, a plain board');
 });

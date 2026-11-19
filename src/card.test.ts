@@ -254,3 +254,18 @@ test('attachment: an upload is logged as one changelog line, the rest of the fil
   assert.equal(applyChange(sample.replace(/\n/g, '\r\n'), { attachment: 'shot.png' }, 'anna', NOW), expected.replace(/\n/g, '\r\n'));
   assert.throws(() => applyChange(sample, { attachment: 'a\n## Changelog' }, 'anna', NOW), /single line/);
 });
+
+test('lane cards: the lane is the folder, the file-name heading leaves it out', () => {
+  const c = parseCard('just text', { ...meta, name: 'front end/fix-login-bug.md' });
+  assert.equal(c.lane, 'front end');
+  assert.equal(c.heading, 'fix login bug');
+  assert.equal(parseCard('x', meta).lane, null);
+});
+
+test('a lane move is logged like a field change, and nothing else changes', () => {
+  const out = applyChange(sample, { lane: { from: null, to: 'frontend' } }, 'bo', NOW);
+  assert.ok(out.startsWith(sample.slice(0, sample.indexOf('## Changelog'))), 'front-matter and body untouched');
+  assert.ok(out.endsWith(`- 2026-11-01T00:00:00Z anna status: (none) → todo\n- ${NOW} bo lane: (none) → frontend\n`));
+  assert.match(applyChange(sample, { lane: { from: 'frontend', to: null } }, 'bo', NOW), /lane: frontend → \(none\)\n$/);
+  assert.equal(applyChange(sample, { lane: { from: 'a', to: 'a' } }, 'bo', NOW), sample);
+});

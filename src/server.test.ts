@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmod, mkdtemp, readFile, writeFile, readdir } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, writeFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
@@ -291,4 +291,61 @@ test('attachments: the upload is kept even if the changelog line cannot be writt
   assert.match(data.warning, /a\.txt was saved, but .*changelog/);
   assert.equal(await readFile(path.join(dir, 'broken', 'a.txt'), 'utf8'), 'keep me');
   assert.equal(await readFile(path.join(dir, 'broken.md'), 'utf8'), broken);
+});
+
+test('lanes: cards in folders, moved by the board with their attachments, never over another card', async (t) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'markanban-'));
+  await mkdir(path.join(dir, 'frontend'));
+  await mkdir(path.join(dir, 'backend'));
+  await writeFile(path.join(dir, 'top.md'), '---\nstatus: todo\n---\n# Top\n');
+  await writeFile(path.join(dir, 'frontend', 'a.md'), '---\nstatus: todo\nrank: 1000\n---\n# A\n');
+  await writeFile(path.join(dir, 'frontend', 'b.md'), '---\nstatus: doing\n---\n# B\n');
+  await writeFile(path.join(dir, 'backend', 'a.md'), '---\nstatus: todo\n---\n# Other A\n');
+  const server = createServer(createStorage(dir), 'tester');
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const base = `http://localhost:${(server.address() as AddressInfo).port}`;
+  const patch = (name: string, body: unknown) =>
+    fetch(`${base}/api/cards/${encodeURIComponent(name)}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const getBoard = async () => (await fetch(`${base}/api/board`)).json();
+
+  let board = await getBoard();
+  assert.deepEqual(board.lanes, [null, 'backend', 'frontend']);
+  assert.deepEqual(board.cards.map((c: { name: string; lane: string | null }) => [c.name, c.lane]).sort(),
+    [['backend/a.md', 'backend'], ['frontend/a.md', 'frontend'], ['frontend/b.md', 'frontend'], ['top.md', null]]);
+
+  // Editing a lane card works like any other card.
+  assert.equal((await patch('frontend/b.md', { fields: { status: 'review' } })).status, 200);
+  assert.match(await readFile(path.join(dir, 'frontend', 'b.md'), 'utf8'), /status: doing → review\n$/);
+
+  // A lane move: file and attachments move, logged, placed in the target cell.
+  await mkdir(path.join(dir, 'top'));
+  await writeFile(path.join(dir, 'top', 'shot.png'), 'png');
+  let res = await patch('top.md', { lane: 'frontend', fields: { status: 'todo' }, place: { before: 'frontend/a.md' } });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { name: 'frontend/top.md' });
+  const moved = await readFile(path.join(dir, 'frontend', 'top.md'), 'utf8');
+  assert.match(moved, /tester lane: \(none\) → frontend\n$/);
+  assert.match(moved, /rank: 0/, 'placed above frontend/a.md');
+  assert.equal(await readFile(path.join(dir, 'frontend', 'top', 'shot.png'), 'utf8'), 'png');
+  board = await getBoard();
+  assert.deepEqual(board.lanes, ['backend', 'frontend'], 'no top-level cards left: no unnamed lane');
+
+  // Refused: same file name in the target lane, a lane that doesn't exist, an unsafe lane name.
+  res = await patch('frontend/a.md', { lane: 'backend' });
+  assert.equal(res.status, 409);
+  assert.match((await res.json()).error, /backend already has a\.md/);
+  assert.equal((await patch('frontend/a.md', { lane: 'nowhere' })).status, 400);
+  assert.equal((await patch('frontend/a.md', { lane: '..' })).status, 400);
+  assert.equal((await patch('frontend/a.md', { lane: 5 })).status, 400);
+  assert.match(await readFile(path.join(dir, 'backend', 'a.md'), 'utf8'), /Other A/, 'nothing overwritten');
+
+  // Back to the top level.
+  res = await patch('frontend/b.md', { lane: null });
+  assert.deepEqual(await res.json(), { name: 'b.md' });
+  assert.match(await readFile(path.join(dir, 'b.md'), 'utf8'), /lane: frontend → \(none\)\n$/);
+
+  // New cards never take a name whose folder holds files: frontend.md would swallow the lane.
+  res = await fetch(`${base}/api/cards`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ heading: 'Frontend' }) });
+  assert.deepEqual(await res.json(), { name: 'frontend-2.md' });
 });

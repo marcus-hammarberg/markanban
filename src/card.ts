@@ -7,7 +7,8 @@ export const KNOWN = ['heading', 'status', 'type', 'assignee', 'tags', 'created'
 export const EDITABLE = ['heading', 'status', 'type', 'assignee', 'tags'];
 
 export interface Card {
-  name: string;
+  name: string; // path in the board folder: `fix-bug.md`, or `frontend/fix-bug.md` in a lane
+  lane: string | null; // the lane folder, null at the top level
   heading: string;
   status: string | null;
   type: string | null;
@@ -33,6 +34,7 @@ export interface Change {
   body?: string;
   archive?: boolean;
   comment?: string;
+  lane?: { from: string | null; to: string | null }; // the file was just moved to another lane: logged, nothing else changes
   attachment?: string; // name of a file just uploaded to the card's folder: logged, nothing else changes
   rank?: number; // board housekeeping: written to front-matter, never logged
   created?: string; // the file's birthtime, stamped on the first write if the card has no `created`
@@ -94,7 +96,7 @@ const toTags = (v: unknown): string[] =>
 
 const h1 = (body: string) => /^# +(.+)$/m.exec(body)?.[1].trim() ?? null;
 
-const fileHeading = (name: string) => name.replace(/\.md$/i, '').replace(/[-_]+/g, ' ').trim();
+const fileHeading = (name: string) => name.split('/').pop()!.replace(/\.md$/i, '').replace(/[-_]+/g, ' ').trim();
 
 // Dropbox "(x's conflicted copy …)", Google Drive / OneDrive "(1)".
 const CONFLICT = /\((\d+|[^)]*conflict[^)]*)\)\.md$/i;
@@ -122,6 +124,7 @@ export function parseCard(raw: string, meta: FileMeta): Card {
   }
   return {
     name: meta.name,
+    lane: meta.name.includes('/') ? meta.name.split('/')[0] : null,
     heading: str(data.heading) ?? h1(p.body) ?? fileHeading(meta.name),
     status: str(data.status)?.trim() || null,
     type: str(data.type),
@@ -220,6 +223,8 @@ export function applyChange(raw: string, change: Change, who: string, now: strin
     comments = (comments ? comments.replace(/\s*$/, '\n\n') : '## Comments\n') + `### ${now} ${who}\n\n${text}\n`;
     log.push(`- ${now} ${who} comment: added`);
   }
+
+  if (change.lane && change.lane.from !== change.lane.to) record('lane', change.lane.from, change.lane.to);
 
   if (change.attachment !== undefined) {
     if (/[\r\n]/.test(change.attachment)) throw new Error('Attachment name must be a single line');

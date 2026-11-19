@@ -83,6 +83,22 @@ button.icon:hover { background: var(--surface); border-color: var(--border-stron
 .column-head .count { color: var(--muted); font-weight: 400; }
 .column-head .title { flex: 1; }
 .column-head.no-status .title { font-style: italic; color: var(--muted); }
+/* Swimlanes: columns stay one element each and line their lane cells up via subgrid; lane headers span the board. */
+.board.lanes { display: grid; align-items: stretch; align-content: start; }
+.board.lanes > .column { grid-row: 1 / -1; display: grid; grid-template-rows: subgrid; align-content: start; }
+.board.lanes > .new-column, .board.lanes > .column.archived { display: flex; align-self: start; }
+.cell { display: flex; flex-direction: column; gap: 8px; min-height: 48px; border-radius: var(--radius-sm); }
+.cell.over { outline: 2px dashed var(--accent); }
+.cell.insert-end { box-shadow: inset 0 -3px 0 var(--accent); }
+.lane-head { grid-column: 1 / -1; align-self: end; display: flex; gap: 6px; align-items: baseline; padding: 6px 12px 4px; border-bottom: 4px solid var(--border-strong); font-weight: 600; pointer-events: none; }
+.lane-head .count { color: var(--muted); font-weight: 400; }
+/* The header is a toggle that collapses the lane; only the button takes clicks, so drops land in the cells. */
+.lane-toggle, .lane-toggle:hover { pointer-events: auto; display: flex; gap: 6px; align-items: center; padding: 4px 8px 4px 0; border: none; background: transparent; font-weight: inherit; }
+.lane-toggle:hover .title { text-decoration: underline; }
+.lane-toggle .chevron { color: var(--muted); font-size: 20px; line-height: 1; width: 24px; text-align: center; }
+.lane-toggle:hover .chevron { color: var(--text); }
+.cell.collapsed { min-height: 24px; justify-content: center; }
+.cell .folded { color: var(--muted); font-size: 12px; padding: 0 4px; }
 .new-column { background: transparent; border: 2px dashed var(--border); color: var(--muted); min-height: 80px; justify-content: center; align-items: center; cursor: pointer; }
 
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; box-shadow: var(--shadow); cursor: pointer; display: flex; flex-direction: column; gap: 6px; }

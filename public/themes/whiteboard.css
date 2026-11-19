@@ -256,3 +256,28 @@
 
 /* The card dialog keeps the normal light look: fields on light grey, not the wall color. */
 :root[data-theme="whiteboard"] dialog { --bg: #f6f7f9; }
+
+/* Swimlanes: a lane name written across the board, with a marker line under it */
+:root[data-theme="whiteboard"] .lane-head {
+  font-family: var(--font-marker);
+  font-weight: normal;
+  font-size: 20px;
+  color: var(--ink-black);
+  position: relative;
+  border-bottom: none;
+}
+/* The same wobbly marker line as between columns, drawn sideways */
+:root[data-theme="whiteboard"] .lane-head::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -5px;
+  height: 10px;
+  background: var(--ink-black);
+  opacity: 0.7;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 10' preserveAspectRatio='none'%3E%3Cpath d='M3 5 C70 3 150 7 210 4.5 S330 4 397 6' stroke='%23000' stroke-width='4.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+:root[data-theme="whiteboard"] .lane-toggle .chevron { color: inherit; opacity: 0.55; }
+:root[data-theme="whiteboard"] .cell .folded { color: var(--ink-black); font-family: var(--font-hand); font-size: 16px; opacity: 0.6; }
+:root[data-theme="whiteboard"] .lane-head .count { color: inherit; opacity: 0.55; font-size: 15px; }

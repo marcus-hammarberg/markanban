@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyChange, newCard, parseCard, slug, type Change } from './card.ts';
-import { CONFIG_FILE, orderColumns, parseConfig, placeCard, rankOrder, replay, setConfigColumns, typeColor } from './board.ts';
+import { CONFIG_FILE, orderColumns, orderLanes, parseConfig, placeCard, rankOrder, replay, setConfigColumns, typeColor } from './board.ts';
 import type { Storage } from './storage.ts';
 
 const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
@@ -50,7 +50,7 @@ export function createServer(storage: Storage, user: string) {
   async function board() {
     const config = parseConfig((await storage.read(CONFIG_FILE)) ?? '');
     // All board rules are decided here; the browser only displays the result.
-    const { files, unreadable } = await storage.list();
+    const { files, unreadable, warnings: found } = await storage.list();
     const cards = (await Promise.all(files.map(async (f) => {
       const card = parseCard(f.text, f);
       return { ...card, color: typeColor(card.type, config.types), attachments: await storage.listAttachments(f.name) };
@@ -60,8 +60,8 @@ export function createServer(storage: Storage, user: string) {
       .map((s) => ({ key: s as string | null, label: s }));
     if (active.some((c) => !c.status)) columns.unshift({ key: null, label: config.noStatusColumn });
     const { warnings, ...settings } = config;
-    warnings.push(...unreadable.map((u) => `${u.name} could not be read and is not shown (${u.message})`));
-    return { folder: path.basename(storage.dir), user, config: settings, warnings, columns, cards };
+    warnings.push(...found, ...unreadable.map((u) => `${u.name} could not be read and is not shown (${u.message})`));
+    return { folder: path.basename(storage.dir), user, config: settings, warnings, columns, lanes: orderLanes(cards), cards };
   }
 
   async function createCard(body: Record<string, unknown>) {
@@ -72,6 +72,8 @@ export function createServer(storage: Storage, user: string) {
     const base = slug(heading);
     for (let i = 1; i < 1000; i++) {
       const name = `${base}${i > 1 ? `-${i}` : ''}.md`;
+      // A folder with files under this name (a lane, say) would become the new card's attachments.
+      if ((await storage.listAttachments(name)).length) continue;
       try {
         await storage.write(name, newCard(heading, status, user, now()), { create: true });
         return { name };
@@ -104,6 +106,22 @@ export function createServer(storage: Storage, user: string) {
       if (typeof body.archive !== 'boolean') throw new HttpError(400, 'archive must be a boolean');
       change.archive = body.archive;
     }
+    // Swimlanes: moving to another lane (null = the top level) moves the file; the lane must exist.
+    let target = name;
+    let laneChange: Change['lane'];
+    if (body.lane !== undefined) {
+      const lane = body.lane;
+      if (lane !== null && typeof lane !== 'string') throw new HttpError(400, 'lane must be a lane name or null');
+      const { cards } = await board();
+      const card = cards.find((c) => c.name === name);
+      if (!card) throw new HttpError(404, `No card ${name}`);
+      if (lane !== card.lane) {
+        if (lane !== null && !cards.some((c) => c.lane === lane)) throw new HttpError(400, `No lane ${lane}`);
+        const file = name.split('/').pop()!;
+        target = lane === null ? file : `${lane}/${file}`;
+        laneChange = { from: card.lane, to: lane };
+      }
+    }
     // Card order: the browser says where ("above card X", or the bottom); the server ranks.
     let rankUpdates: { name: string; rank: number }[] = [];
     if (body.place !== undefined) {
@@ -115,7 +133,8 @@ export function createServer(storage: Storage, user: string) {
       const card = cards.find((c) => c.name === name);
       if (!card) throw new HttpError(404, `No card ${name}`);
       const status = change.fields && 'status' in change.fields ? change.fields.status?.trim() || null : card.status;
-      const column = cards.filter((c) => !c.archived && c.name !== name && c.status === status).sort(rankOrder);
+      const lane = laneChange ? laneChange.to : card.lane;
+      const column = cards.filter((c) => !c.archived && c.name !== name && c.status === status && c.lane === lane).sort(rankOrder);
       try {
         const plan = placeCard(column, place.before);
         change.rank = plan.rank;
@@ -126,13 +145,20 @@ export function createServer(storage: Storage, user: string) {
     }
 
     // Re-read right before writing so external edits are never overwritten with a stale copy.
-    const raw = await storage.read(name);
+    let raw = await storage.read(name);
     if (raw === null) throw new HttpError(404, `No card ${name}`);
     let next: string;
     try {
       next = await applyTo(name, raw, change);
     } catch (e) {
       throw new HttpError(400, (e as Error).message);
+    }
+    if (laneChange) {
+      // The change applies cleanly (checked above), so move the file, then log the move in its new place.
+      await storage.move(name, target);
+      change.lane = laneChange;
+      raw = (await storage.read(target)) ?? raw;
+      next = await applyTo(target, raw, change);
     }
     if (next === raw && !rankUpdates.length) return { name };
     const before = await statusColumns();
@@ -142,9 +168,9 @@ export function createServer(storage: Storage, user: string) {
       const ranked = await applyTo(u.name, text, { rank: u.rank });
       if (ranked !== text) await storage.write(u.name, ranked);
     }
-    if (next !== raw) await storage.write(name, next);
+    if (next !== raw) await storage.write(target, next);
     await keepColumns(before);
-    return { name };
+    return { name: target };
   }
 
   // Uploads are raw bytes, not JSON, so the CSRF guard is a custom header instead: a cross-site page

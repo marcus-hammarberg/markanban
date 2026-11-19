@@ -17,9 +17,10 @@ npx markanban [folder]     # folder defaults to .
 
 ## Cards
 
-A card is any `*.md` file directly in the board folder.
+A card is any `*.md` file directly in the board folder, or directly in a lane folder (see Swimlanes).
 
-- Excluded: `README.md`, hidden files (`.*`), subfolders (a folder named after a card holds its attachments, see Attachments).
+- Excluded: `README.md`, hidden files (`.*`), and folders: a folder named after a card holds its attachments (see Attachments), any other folder is a lane.
+- A card is identified by its path relative to the board folder: `fix-bug.md`, or `frontend/fix-bug.md` in a lane.
 - Files without front-matter are still cards.
 - Sync-conflict copies (`name (1).md`, `name (conflicted copy).md`, etc.) are shown as normal cards with a ⚠️ "possible sync conflict" badge. No auto-merge.
 
@@ -151,7 +152,7 @@ Checked in staging.
 
 Every card has a link, so it can be pasted into chat, a ticket or a note. Client-side only: no server or API change.
 
-- Format: `http://localhost:<port>/#card=<file name>`, name URL-encoded (`#card=fix-login-bug.md`). The file name never changes, so the link is stable. The host and port are the sender's own; a team that shares a board should agree on a port.
+- Format: `http://localhost:<port>/#card=<card path>`, URL-encoded (`#card=fix-login-bug.md`, `#card=frontend%2Ffix-login-bug.md`). The file name never changes, so the link is stable; after a lane move it still opens the card by file name (see Swimlanes). The host and port are the sender's own; a team that shares a board should agree on a port.
 - The address bar follows the dialog: opening a card (click, Enter or link) sets the hash, closing it clears the hash. Back/Forward therefore open and close cards.
 - Arriving on a link opens the card once the board has loaded, and again on every hash change.
 - Archived cards open even when "Show archived" is off; filters never affect the dialog.
@@ -258,10 +259,37 @@ A separate, read-only mode that plays back how cards moved across the board over
 - Ranks aren't logged, so order changes can't be replayed; cards in a replayed column are shown in their current order.
 
 **Demo board**
-- `npm run demo [folder]` (`src/demo.ts`, default `demo-board`) writes a board telling how Markanban was built: the real commit order, stretched over three weeks and dated back from today so the story ends just now. Cards are written with `newCard`/`applyChange`, exactly as the UI would. Refuses a folder that isn't new or empty; never overwrites. A dev script, not part of the CLI.
+- `npm run demo [folder]` (`src/demo.ts`, default `demo-board`) writes a board telling how Markanban was built: the real commit order, stretched over three weeks and dated back from today so the story ends just now. Cards sit in three lane folders (`1 Cards & files`, `2 Board`, `3 Sharing & release`) with the newest at the top level, and one card has a logged lane move. Cards are written with `newCard`/`applyChange`, exactly as the UI would. Refuses a folder that isn't new or empty; never overwrites. A dev script, not part of the CLI.
 
 **Known gap (accepted)**
 - Edits made outside the UI aren't in the changelog, so such a card jumps to its current state at the end. Replay is only as complete as the changelog.
+
+### Swimlanes
+
+Lanes are horizontal rows that share one set of columns. A lane is a folder in the board folder; there is no config.
+
+**Which folders are lanes**
+- A visible folder `X/` directly in the board folder is a lane, unless `X.md` sits next to it (then it is that card's attachment folder). Lane cards are the `*.md` files directly in it, with the same rules as top-level cards; a lane card's attachments are in `X/<card>/`.
+- A folder is a lane only while it holds at least one card file (archived ones count). Folders without cards (`images/`, orphan attachment folders) are not shown and give no warning.
+- One level only. A folder inside a lane that isn't a lane card's attachment folder is ignored; if it holds `*.md` files, a warning says they are not shown.
+- A hand-made `X.md` next to a lane folder `X/` that holds cards turns that folder into its attachment folder; a warning names both. New cards from the UI never take a name whose folder already holds files (`frontend-2.md`).
+
+**Board**
+- No lanes: the board looks exactly as before.
+- With lanes, top-level cards form the first lane, without a header, shown only when it has active cards. Named lanes follow in natural, case-insensitive name order (`lane 2` before `lane 10`); the label is the folder name as written. Order them with a prefix such as `1 Frontend`.
+- Column headers show once, at the top. Each named lane has a full-width header with its name and active card count. Archived cards share one Archived column.
+- Clicking a lane header (a button, so Tab and Enter work too) collapses the lane to its header, with a "3 cards" note in each column. Clicking again opens it. Collapsed lanes are a per-person view setting kept in the browser (`localStorage`, per board folder name), never in the board folder; they stay collapsed in Replay. A card dropped on a collapsed lane goes to the bottom of that column; Alt+↑/↓ skips collapsed lanes. The top-level lane has no header and can't collapse.
+- Lanes always show while filtering, even when empty. There is no lane filter, and search doesn't match lane names.
+- `/api/board` returns `lanes` (named lanes in order, with `null` first when top-level cards are shown) and each card's `lane` (folder name or `null`).
+
+**Moving between lanes**
+- Lanes are created and removed in the file system only. The UI moves cards between lanes that exist.
+- Dragging a card into another lane's cell moves it there (and to that column). The keyboard moves within the card's lane cell; Alt+↓ on the bottom card of a cell moves it to the top of the same column in the next lane, Alt+↑ on the top card to the bottom of the previous lane (the top-level lane counts as the first), so the opposite key undoes it.
+- A move renames the card file into the target folder and moves its attachment folder with it (folder first; if the card can't follow, the folder is moved back). It is logged as `lane: (none) → frontend`. The browser sends `lane: <name> | null` on `PATCH /api/cards/:name`; the server checks the lane exists.
+- A move is refused when the target already has a card file or a folder with that name ("frontend already has fix-bug.md"). Names never change to make room.
+- A card link to a path that no longer exists opens the card if exactly one card has that file name, so links survive lane moves.
+- New cards from "+" are created at the top level.
+- Replay shows every card in its current lane; lane moves are not replayed.
 
 ### Attachments
 
@@ -282,10 +310,10 @@ Every file in a sibling folder named after the card file is an attachment: `fix-
 **Serving**
 - Only png, jpg, gif and webp are shown inline; everything else is sent as `Content-Disposition: attachment`. Every response has `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox`, so an `.html` or `.svg` attachment can't run script against the API.
 - `GET /api/cards/<card>/attachments/<file>` serves a file; `POST /api/cards/<card>/attachments?name=<file name>` uploads one and returns `{ name }` (plus `warning` if the log line failed).
-- Paths are `<card>/<file>` only: one level, no `..`, no hidden files. Checked in `storage.ts`.
+- Paths are `[<lane>/]<card>/<file>` only: no `..`, no hidden files. Checked in `storage.ts`.
 
 **Live updates and storage**
-- The 3-second poll also checks each card folder (names, sizes, mtimes; no contents).
+- The 3-second poll also checks each card folder and each lane folder (names, sizes, mtimes; no contents).
 - `storage.ts` gets `listAttachments`, `readAttachment` and `writeAttachment`, so a Drive/hosted backend still replaces one module.
 
 **Edge cases (accepted)**
@@ -299,7 +327,7 @@ Every file in a sibling folder named after the card file is an attachment: `fix-
 - TypeScript on Node 22+, published as compiled JS (runs via `npx`).
 - Runtime dependency: `yaml` (Document API, preserves comments/order). Dev: `typescript`.
 - Server: `node:http`, `fs.watch` + polling, SSE. Frontend: plain HTML/CSS/JS, native drag & drop, no framework.
-- Storage module with exactly seven operations: `list`, `read`, `write`, `watch`, and `listAttachments`, `readAttachment`, `writeAttachment`. No other abstraction.
+- Storage module with exactly eight operations: `list`, `read`, `write`, `move`, `watch`, and `listAttachments`, `readAttachment`, `writeAttachment`. No other abstraction.
 - Security: bind to `127.0.0.1` only. All file paths resolved and verified to be inside the board folder (no `../` escape). JSON writes require `application/json`, uploads require the `X-Markanban: 1` header (both force a CORS preflight, which is never answered). Attachments are served with `nosniff` and `CSP: sandbox`; only safe image types inline.
 - Preserve line endings (CRLF on Windows). macOS primary; Linux/Windows should work via Node.
 
@@ -316,7 +344,7 @@ Sharing a board = putting the folder in a sync client's folder (Google Drive for
 
 ## Deferred (not v1)
 
-- Swimlanes from subfolders
+- Swimlanes: different statuses per lane; a "Lane" field in the card dialog that can create a lane; a "+ lane" drop zone; "+" per lane cell; reordering lanes in the UI; replaying lane moves
 - Hosted version
 - Logging external edits
 - LAN access flag
@@ -324,3 +352,5 @@ Sharing a board = putting the folder in a sync client's folder (Google Drive for
 - Board-level default theme in `.markanban.yml`
 - `.markanban.yml` in the run folder pointing at a board folder
 - Editing unknown fields in the UI
+- WIP limits by column name convention, e.g. `doing (3)`: the number caps the cards in that column and the header warns when it is exceeded
+- Blocker marker on a card (e.g. a `blocked` field holding the reason), shown prominently on the board

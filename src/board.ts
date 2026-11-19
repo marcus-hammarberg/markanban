@@ -102,6 +102,16 @@ export function orderColumns(statuses: string[], configured: string[]): string[]
   return [...new Set(configured), ...rest];
 }
 
+/**
+ * Swimlanes: top-level cards first (an unnamed lane, only while it has active cards), then lane folders in
+ * natural, case-insensitive order. Archived cards keep a folder lane alive. `[null]` alone is a plain board.
+ */
+export function orderLanes(cards: { lane: string | null; archived: string | null }[]): (string | null)[] {
+  const named = [...new Set(cards.flatMap((c) => (c.lane === null ? [] : [c.lane])))]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }) || a.localeCompare(b));
+  return [...(cards.some((c) => c.lane === null && !c.archived) || !named.length ? [null] : []), ...named];
+}
+
 // ---- Card order within a column (priority: top = most important) ----
 
 const STEP = 1000;
