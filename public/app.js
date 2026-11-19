@@ -60,23 +60,22 @@ const day = (iso) => (iso ? new Date(iso).toLocaleString() : '');
 
 // --- theme -----------------------------------------------------------------
 
-const THEMES = ['system', 'light', 'dark'];
-const ICONS = { system: '◐ System', light: '☀ Light', dark: '☾ Dark' };
+// The options in the #theme <select> are the themes; "system" follows the OS (light or dark).
+const themeSelect = $('#theme');
+const THEMES = [...themeSelect.options].map((o) => o.value);
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');
 
 function setTheme(mode) {
   const effective = mode === 'system' ? (darkQuery.matches ? 'dark' : 'light') : mode;
   document.documentElement.dataset.theme = effective;
-  $('#theme').textContent = ICONS[mode];
-  $('#theme').dataset.mode = mode;
+  themeSelect.value = mode;
 }
 
-$('#theme').addEventListener('click', () => {
-  const next = THEMES[(THEMES.indexOf($('#theme').dataset.mode) + 1) % THEMES.length];
-  store.set('markanban-theme', next);
-  setTheme(next);
+themeSelect.addEventListener('change', () => {
+  store.set('markanban-theme', themeSelect.value);
+  setTheme(themeSelect.value);
 });
-darkQuery.addEventListener('change', () => setTheme($('#theme').dataset.mode));
+darkQuery.addEventListener('change', () => setTheme(themeSelect.value));
 setTheme(THEMES.includes(store.get('markanban-theme')) ? store.get('markanban-theme') : 'system');
 
 // --- board -----------------------------------------------------------------

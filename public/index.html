@@ -15,13 +15,19 @@
   <link rel="stylesheet" href="style.css">
   <!-- Themes: each file overrides tokens (and anything else) under :root[data-theme="…"] -->
   <link rel="stylesheet" href="themes/dark.css">
+  <link rel="stylesheet" href="themes/whiteboard.css">
 </head>
 <body>
   <header class="topbar">
     <h1 id="title">Markanban</h1>
     <label class="toggle"><input type="checkbox" id="show-archived"> Show archived</label>
     <button id="replay-start" title="Play back how cards moved over time">▶ Replay</button>
-    <button id="theme" title="Theme"></button>
+    <select id="theme" title="Theme" aria-label="Theme">
+      <option value="system">◐ System</option>
+      <option value="light">☀ Light</option>
+      <option value="dark">☾ Dark</option>
+      <option value="whiteboard">✎ Whiteboard</option>
+    </select>
   </header>
   <div id="error" class="error" hidden></div>
   <div id="warnings" class="warnings" hidden></div>

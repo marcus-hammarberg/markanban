@@ -40,10 +40,11 @@
 /* `hidden` must always win, even over components that set their own display (e.g. .warnings). */
 [hidden] { display: none !important; }
 body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; }
-button, input, textarea { font: inherit; color: inherit; }
+button, input, textarea, select { font: inherit; color: inherit; }
 
 .topbar { display: flex; align-items: center; gap: var(--gap); padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
 .topbar h1 { font-size: 16px; margin: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar select { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); padding: 4px 8px; cursor: pointer; }
 .topbar .toggle { flex-direction: row; font-size: 14px; display: flex; gap: 6px; align-items: center; color: var(--muted); cursor: pointer; }
 
 /* Secondary (default): bordered and full-contrast text, so it clearly reads as a button. */

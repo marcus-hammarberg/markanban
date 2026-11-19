@@ -78,7 +78,7 @@ To change the order, drag a column by its header (⠿), or hover over the header
 - **Archive** cards you're done with. They disappear from the board; tick **Show archived** to see them again and unarchive. There's no delete button: to remove a card for good, delete its file.
 - **Filter** with the row above the board: search text (headings, card text, comments and attachment names), or pick a type, assignee or tag.
 - **Replay** shows how the board got here: **▶ Replay** in the top right plays back how cards moved between columns, 8 hours per second. Drag the slider to jump around, and use the filters to follow one person or tag. The board is read-only while replaying; **Exit replay** brings back the live board.
-- **Theme**: the board follows your system's light or dark mode. The button in the top right switches between System, Light and Dark.
+- **Theme**: the board follows your system's light or dark mode. The theme menu in the top right picks System, Light, Dark or Whiteboard, which turns the board into a whiteboard covered in sticky notes.
 
 ## History and comments
 

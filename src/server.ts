@@ -8,7 +8,7 @@ import { CONFIG_FILE, orderColumns, parseConfig, placeCard, rankOrder, replay, s
 import type { Storage } from './storage.ts';
 
 const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
-const TYPES: Record<string, string> = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml' };
+const TYPES: Record<string, string> = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 const MAX_BODY = 1_000_000;
 const MAX_ATTACHMENT = 50 * 1024 * 1024;
 // Only these show in the browser; everything else downloads, so an .html or .svg can't run script here.

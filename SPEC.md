@@ -180,7 +180,8 @@ Drag a column by its header (⠿ grip) and drop it on either half of another col
 
 - Every color, font, radius, border and shadow is a CSS custom property on `:root`. No hard-coded colors in components.
 - A theme = one CSS file, activated by `<html data-theme="…">`. Themes may override any rule, not just variables (so a hand-drawn theme can change fonts, borders, rotation, filters).
-- v1 ships **light** and **dark**. Default follows the OS (`prefers-color-scheme`). Header toggle: System → Light → Dark; a manual choice is saved in `localStorage`.
+- Ships **light**, **dark** and **whiteboard**. Default follows the OS (`prefers-color-scheme`, light or dark). Header dropdown: System, Light, Dark, Whiteboard; a manual choice is saved in `localStorage`.
+- **Whiteboard** (`themes/whiteboard.css`, CSS only): an aluminium-framed whiteboard with a marker tray, column headers and dividers drawn in marker, cards as slightly tilted sticky notes whose color is the type color (no type = canary yellow), type underlined and tags written as `#tag`. Fonts: Permanent Marker (headings, Apache 2.0) and Covered By Your Grace (notes, OFL), bundled in `public/fonts/` with their licences and served by Markanban, so nothing is fetched from the internet; OS handwriting fonts are the fallback. The card dialog keeps the normal light look.
 
 ### Card order (priority)
 
@@ -320,6 +321,6 @@ Sharing a board = putting the folder in a sync client's folder (Google Drive for
 - Logging external edits
 - LAN access flag
 - Delete cards
-- Hand-drawn theme; board-level default theme in `.markanban.yml`
+- Board-level default theme in `.markanban.yml`
 - `.markanban.yml` in the run folder pointing at a board folder
 - Editing unknown fields in the UI

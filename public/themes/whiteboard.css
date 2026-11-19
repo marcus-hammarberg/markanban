@@ -1,0 +1,258 @@
+/* Bundled handwriting fonts (served by Markanban, no downloads). Licences next to the files in /fonts.
+   Missing glyphs or files fall back to the OS handwriting faces in --font-hand / --font-marker. */
+@font-face { font-family: "Permanent Marker"; src: url("../fonts/permanent-marker.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Covered By Your Grace"; src: url("../fonts/covered-by-your-grace.woff2") format("woff2"); font-display: swap; }
+
+/* Whiteboard: an aluminium-framed whiteboard on the wall, columns drawn in marker, cards as sticky notes.
+   Only the board changes; the card dialog keeps the normal (light) look.
+   Fonts: Permanent Marker (headings) and Covered By Your Grace (notes), bundled in public/fonts. */
+:root[data-theme="whiteboard"] {
+  --bg: #e4e0d8;              /* the wall */
+  --column-width: 236px;      /* sticky notes are roughly square */
+  --wall-light: #f0ede6;
+  --surface: #ffffff;
+  --column-bg: #eef0f3;
+  --text: #22252b;
+  --muted: #6b6f78;
+  --border: #d6d8dc;
+  --border-strong: #a9adb5;
+  --accent: #1f4fd1;
+  --accent-text: #ffffff;
+  --chip-bg: #e7ecfb;
+  --chip-text: #1f3a8a;
+  --warn: #b45309;
+  --danger: #c62828;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  --shadow-lift: 0 6px 16px rgb(0 0 0 / 0.14);
+
+  --font-hand: "Covered By Your Grace", "Noteworthy", "Bradley Hand", "Segoe Print", "Ink Free", "Comic Sans MS", cursive;
+  --font-marker: "Permanent Marker", "Marker Felt", "Chalkboard SE", "Ink Free", "Segoe Print", "Comic Sans MS", cursive;
+
+  /* Marker inks for the drawn parts of the board */
+  --ink-blue: #1f4fd1;
+  --ink-red: #c62828;
+  --ink-green: #2e7d32;
+  --ink-black: #2a2d33;
+
+  --board: #fbfbf8;
+  --frame: linear-gradient(135deg, #eef0f2, #a7adb5 30%, #e6e9ec 50%, #9ba1a9 75%, #d9dde1);
+  --tray: linear-gradient(#d7dbe0, #a3a9b1 60%, #8d939b);
+
+  /* Sticky notes: the type palette becomes the note color. No type = classic canary yellow. */
+  --note-default: #fff27a;
+  --note-ink: #2a2a22;
+  --note-muted: rgb(0 0 0 / 0.58);
+  --note-shadow: 0 1px 1px rgb(0 0 0 / 0.12), 0 10px 12px -8px rgb(0 0 0 / 0.38);
+  --note-shadow-lift: 0 2px 2px rgb(0 0 0 / 0.1), 0 18px 22px -10px rgb(0 0 0 / 0.4);
+  --type-red: #ff9b93;
+  --type-orange: #ffbd73;
+  --type-yellow: #ffdf4f;
+  --type-green: #bdf08f;
+  --type-teal: #8eead6;
+  --type-blue: #a3d5ff;
+  --type-purple: #d2bcff;
+  --type-pink: #ffa6d6;
+  --type-grey: #dcdde0;
+  color-scheme: light;
+}
+
+/* --- the wall and the frame --------------------------------------------- */
+
+:root[data-theme="whiteboard"] body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: radial-gradient(ellipse at 50% 0%, var(--wall-light), var(--bg) 70%) fixed;
+}
+:root[data-theme="whiteboard"] .topbar,
+:root[data-theme="whiteboard"] .filters { background: transparent; border-bottom: none; }
+:root[data-theme="whiteboard"] .topbar h1 { font-family: var(--font-marker); font-weight: normal; font-size: 24px; color: var(--ink-black); }
+:root[data-theme="whiteboard"] .filters { padding-top: 0; }
+:root[data-theme="whiteboard"] .filters input,
+:root[data-theme="whiteboard"] .filters select { background: var(--surface); }
+
+/* The board itself: white surface with faint ghosts of old, erased writing and a sheen,
+   an aluminium frame, and a marker tray (with markers and an eraser) along the bottom edge.
+   Backgrounds stay put while the notes scroll sideways across it. */
+:root[data-theme="whiteboard"] .board {
+  flex: 1;
+  min-height: 420px;
+  margin: 4px 16px 20px;
+  padding: 28px 28px 36px;
+  gap: 30px;
+  align-items: stretch;
+  border: 10px solid transparent;
+  border-bottom-width: 28px;
+  border-radius: 10px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 330 20'%3E%3Cg stroke='%23000' stroke-opacity='.25' stroke-width='.8'%3E%3Crect x='1' y='5' width='64' height='11' rx='5' fill='%23f6f6f3'/%3E%3Crect x='58' y='5' width='26' height='11' rx='4' fill='%231f4fd1'/%3E%3Crect x='14' y='5' width='6' height='11' fill='%231f4fd1'/%3E%3Crect x='96' y='5' width='64' height='11' rx='5' fill='%23f6f6f3'/%3E%3Crect x='153' y='5' width='26' height='11' rx='4' fill='%23c62828'/%3E%3Crect x='109' y='5' width='6' height='11' fill='%23c62828'/%3E%3Crect x='194' y='6' width='64' height='11' rx='5' fill='%23f6f6f3' transform='rotate(-3 226 11)'/%3E%3Crect x='251' y='6' width='26' height='11' rx='4' fill='%232e7d32' transform='rotate(-3 226 11)'/%3E%3Crect x='207' y='6' width='6' height='11' fill='%232e7d32' transform='rotate(-3 226 11)'/%3E%3C/g%3E%3Crect x='288' y='1' width='40' height='13' rx='3' fill='%23383c44'/%3E%3Crect x='288' y='12' width='40' height='6' rx='2' fill='%23d8d2c4'/%3E%3C/svg%3E")
+      right 40px bottom 5px / 330px 20px no-repeat border-box,
+    var(--tray) bottom / 100% 28px no-repeat border-box,
+    radial-gradient(ellipse 260px 70px at 22% 38%, rgb(90 105 150 / 0.07), transparent 70%) padding-box,
+    radial-gradient(ellipse 340px 90px at 70% 68%, rgb(150 90 90 / 0.05), transparent 70%) padding-box,
+    radial-gradient(ellipse 180px 50px at 88% 18%, rgb(90 105 150 / 0.06), transparent 70%) padding-box,
+    linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.9) 48%, transparent 62%) padding-box,
+    linear-gradient(var(--board), var(--board)) padding-box,
+    var(--frame) border-box;
+  box-shadow: 0 14px 28px rgb(0 0 0 / 0.18), 0 2px 4px rgb(0 0 0 / 0.14), inset 0 1px 8px rgb(0 0 0 / 0.1);
+}
+:root[data-theme="whiteboard"] body.replaying .board {
+  box-shadow: 0 14px 28px rgb(0 0 0 / 0.18), inset 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* --- columns, drawn in marker ------------------------------------------- */
+
+:root[data-theme="whiteboard"] .column {
+  --ink: var(--ink-blue);
+  position: relative;
+  background: transparent;
+  padding: 2px 6px 16px;
+  gap: 16px;
+}
+:root[data-theme="whiteboard"] .column:nth-child(4n+2) { --ink: var(--ink-red); }
+:root[data-theme="whiteboard"] .column:nth-child(4n+3) { --ink: var(--ink-green); }
+:root[data-theme="whiteboard"] .column:nth-child(4n) { --ink: var(--ink-black); }
+
+/* A wobbly marker line between columns */
+:root[data-theme="whiteboard"] .column + .column:not(.new-column)::before {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 0;
+  bottom: 6px;
+  width: 10px;
+  background: var(--ink-black);
+  opacity: 0.7;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 400' preserveAspectRatio='none'%3E%3Cpath d='M5 3 C7 70 3 150 5.5 210 S6 330 4 397' stroke='%23000' stroke-width='4.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+
+:root[data-theme="whiteboard"] .column-head {
+  position: relative;
+  padding: 2px 4px 12px;
+  font-family: var(--font-marker);
+  font-weight: normal;
+  font-size: 22px;
+  color: var(--ink);
+}
+/* Underline, drawn with the same marker */
+:root[data-theme="whiteboard"] .column-head::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 6px;
+  bottom: 2px;
+  height: 9px;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 10' preserveAspectRatio='none'%3E%3Cpath d='M3 6 C40 3 80 8.5 120 5 S178 3.5 197 6.5' stroke='%23000' stroke-width='2.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+:root[data-theme="whiteboard"] .column-head.no-status .title { color: inherit; }
+:root[data-theme="whiteboard"] .column-head .count {
+  color: inherit;
+  font-size: 15px;
+  margin-left: 4px;
+  min-width: 28px;
+  padding: 0 5px;
+  text-align: center;
+  border: 2px solid currentColor;
+  border-radius: 52% 46% 55% 44% / 48% 55% 45% 52%; /* a hand-drawn circle */
+}
+:root[data-theme="whiteboard"] .column-head .grip { color: inherit; opacity: 0.45; }
+:root[data-theme="whiteboard"] .column-head button.icon { color: inherit; font-family: var(--font-marker); font-size: 22px; }
+:root[data-theme="whiteboard"] .column-head button.icon:hover { background: transparent; border-color: currentColor; border-radius: 50% 44% 52% 46% / 46% 52% 44% 50%; }
+
+:root[data-theme="whiteboard"] .column.over {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+:root[data-theme="whiteboard"] .column.archived .card { filter: saturate(0.35); }
+
+:root[data-theme="whiteboard"] .new-column {
+  align-self: flex-start;
+  min-height: 130px;
+  padding: 16px;
+  font-family: var(--font-marker);
+  font-size: 20px;
+  color: var(--muted);
+  border: 2px dashed var(--border-strong);
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; /* a wobbly box */
+}
+:root[data-theme="whiteboard"] .new-column:hover { color: var(--ink-black); border-color: var(--ink-black); }
+
+/* --- sticky notes --------------------------------------------------------- */
+
+:root[data-theme="whiteboard"] .card {
+  --note: var(--note-default);
+  --tilt: -1.4deg;
+  min-height: 150px;
+  margin: 0 4px;
+  padding: 18px 14px 18px;
+  gap: 8px;
+  border: none;
+  border-radius: 2px 2px 3px 2px;
+  border-bottom-right-radius: 48px 6px; /* the curled-up corner */
+  color: var(--note-ink);
+  background-color: var(--note);
+  /* darker adhesive strip along the top, and a faint fold in the paper */
+  background-image:
+    linear-gradient(rgb(0 0 0 / 0.07), transparent 24px),
+    linear-gradient(160deg, rgb(255 255 255 / 0.28), transparent 45%, rgb(0 0 0 / 0.04));
+  box-shadow: var(--note-shadow);
+  font-family: var(--font-hand);
+  font-size: 15px;
+  transform: rotate(var(--tilt));
+}
+/* No two notes hang quite the same way (the column header is child 1, so cards start at 2). */
+:root[data-theme="whiteboard"] .card:nth-child(2n+1) { --tilt: 1.3deg; }
+:root[data-theme="whiteboard"] .card:nth-child(3n+1) { --tilt: -0.5deg; }
+:root[data-theme="whiteboard"] .card:nth-child(5n) { --tilt: 2.2deg; }
+:root[data-theme="whiteboard"] .card:nth-child(7n) { --tilt: -2.4deg; }
+
+:root[data-theme="whiteboard"] .card:hover,
+:root[data-theme="whiteboard"] .card:focus-visible {
+  transform: rotate(calc(var(--tilt) * 0.3)) translateY(-3px);
+  box-shadow: var(--note-shadow-lift);
+}
+:root[data-theme="whiteboard"] .card.dragging { opacity: 0.5; transform: rotate(4deg) scale(0.97); }
+:root[data-theme="whiteboard"] .card.insert-before { box-shadow: 0 -5px 0 var(--accent), var(--note-shadow); }
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="whiteboard"] .card { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+}
+
+/* Type colors the whole note instead of a stripe. */
+:root[data-theme="whiteboard"] .card[data-color] { --note: var(--card-color); border-left: none; padding-left: 14px; }
+
+:root[data-theme="whiteboard"] .card .heading { font-weight: normal; font-size: 21px; line-height: 1.25; }
+:root[data-theme="whiteboard"] .card .meta { color: var(--note-muted); font-size: 16px; gap: 10px; }
+/* Type and tags are scribbled on the note, not boxed: the type circled with a quick pen loop, tags as #hashtags. */
+:root[data-theme="whiteboard"] .type-chip,
+:root[data-theme="whiteboard"] .card[data-color] .type-chip {
+  position: relative;
+  padding: 0 7px;
+  color: var(--note-ink);
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+:root[data-theme="whiteboard"] .type-chip::after {
+  content: "";
+  position: absolute;
+  inset: -3px -2px -2px -3px;
+  background: var(--note-ink);
+  opacity: 0.6;
+  pointer-events: none;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M14 7 C40 0 86 2 95 15 C102 28 74 38 46 37 C18 36 2 30 3 19 C4 9 24 3 44 5' stroke='%23000' stroke-width='1.6' fill='none' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+:root[data-theme="whiteboard"] .card .chips { gap: 2px 10px; }
+:root[data-theme="whiteboard"] .card .chip {
+  padding: 0;
+  color: var(--note-muted);
+  background: none;
+  font-size: 16px;
+}
+:root[data-theme="whiteboard"] .card .chip:not(.extra)::before { content: "#"; }
+:root[data-theme="whiteboard"] .card .chip.extra { border: none; font-size: 11px; }
+
+/* The card dialog keeps the normal light look: fields on light grey, not the wall color. */
+:root[data-theme="whiteboard"] dialog { --bg: #f6f7f9; }

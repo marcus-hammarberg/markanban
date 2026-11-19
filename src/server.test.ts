@@ -92,6 +92,7 @@ test('static UI files are served, nothing outside public/ is, and bad JSON is re
   assert.equal((await request('GET', '/app.js')).type, 'text/javascript');
   assert.equal((await request('GET', '/style.css')).type, 'text/css');
   assert.equal((await request('GET', '/themes/dark.css')).status, 200);
+  assert.equal((await request('GET', '/fonts/permanent-marker.woff2')).type, 'font/woff2');
   assert.equal((await request('GET', '/nope.html')).status, 404);
   assert.equal((await request('GET', '/api/nope')).status, 404);
 
