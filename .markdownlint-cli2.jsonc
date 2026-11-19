@@ -1,0 +1,12 @@
+{
+  // Lints the repo's own docs. Board folders (cards) are user content and not linted here;
+  // the card files Markanban writes are kept lint-clean by tests in src/card.test.ts.
+  "globs": ["*.md"],
+  // CLAUDE.md is a single "@AGENTS.md" import line, not a document.
+  "ignores": ["CLAUDE.md"],
+  "config": {
+    "default": true,
+    "MD013": false, // long lines: prose is one line per paragraph
+    "MD036": false // SPEC.md uses **Bold** labels for small sub-sections on purpose
+  }
+}

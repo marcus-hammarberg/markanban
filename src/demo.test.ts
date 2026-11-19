@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { demoBoard } from './demo.ts';
 import { parseCard } from './card.ts';
+import { lint } from 'markdownlint/sync';
 import { orderLanes, replay } from './board.ts';
 
 test('demo board: every card parses and replays to its current state, ending just before now', () => {
@@ -32,4 +33,15 @@ test('demo board: cards sit in lane folders, one stays at the top level, and one
   assert.equal(moved.length, 1);
   assert.match(moved[0].history.find((l) => l.includes(' lane: '))!, new RegExp(`lane: .+ → ${moved[0].lane}$`), 'logged move ends in the lane the file is in');
   assert.equal(cards.find((c) => c.heading === 'Swimlanes from subfolders')?.status, 'done');
+});
+
+// The demo writes cards with the same functions as the board, so this guards every card Markanban writes.
+test('demo board: every card passes markdownlint (same rules as the repo docs)', () => {
+  const files = demoBoard(Date.parse('2026-11-18T12:00:00Z'));
+  const strings = Object.fromEntries([...files].filter(([name]) => name.endsWith('.md')));
+  const results = lint({ strings, config: { default: true, MD013: false } });
+  const problems = Object.entries(results).flatMap(([name, errors]) =>
+    errors.map((e) => `${name}:${e.lineNumber} ${e.ruleNames.join('/')} ${e.ruleDescription}`));
+  assert.ok(Object.keys(strings).length > 15);
+  assert.deepEqual(problems, []);
 });

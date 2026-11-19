@@ -285,7 +285,7 @@ function insertionPoint(columnEl, y) {
 }
 
 function clearMarkers() {
-  document.querySelectorAll('.insert-before, .insert-end').forEach((el) => el.classList.remove('insert-before', 'insert-end'));
+  for (const el of document.querySelectorAll('.insert-before, .insert-end')) el.classList.remove('insert-before', 'insert-end');
 }
 
 // positioned: dropping shows (and uses) the exact spot between cards; otherwise the card goes to the bottom.

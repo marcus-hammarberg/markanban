@@ -15,7 +15,7 @@ npx github:marcus-hammarberg/markanban ./my-board
 This opens the board in your browser at <http://localhost:4242>. The folder is created if it doesn't exist yet; leave it out to use the current one. The first run takes a little longer while it downloads and builds.
 
 | Option | What it does |
-|---|---|
+| --- | --- |
 | `--port 4242` | Port to run on |
 | `--user anna` | Your name in comments and history (see [Who you are](#who-you-are)) |
 | `--no-open` | Don't open the browser automatically |
@@ -51,7 +51,7 @@ Users get logged out after 5 minutes.
 Every field is optional:
 
 | Field | Meaning |
-|---|---|
+| --- | --- |
 | `status` | The column the card is in |
 | `type` | Free text, e.g. `bug` or `feature`; also sets the card's [color](#colors) |
 | `assignee` | Who is working on it |
@@ -128,7 +128,7 @@ The card view shows comments and history separately from the card's text. Change
 Cards get a colored edge based on their `type`. Common types have colors out of the box:
 
 | Color | Types |
-|---|---|
+| --- | --- |
 | red | bug, defect, incident |
 | orange | epic |
 | yellow | spike, research |
@@ -201,9 +201,12 @@ Design and behaviour are described in [`SPEC.md`](SPEC.md). Development conventi
 
 ```sh
 npm install
-npm test
+git config core.hooksPath .githooks   # once: runs the checks before every push
+npm run check                          # lint, type check and tests
 npm start -- ./some-board
 ```
+
+Changes go straight to `main`. The same `npm run check` runs on GitHub for every push.
 
 To see Replay in action, generate a demo board: the story of how Markanban itself was built, about 20 cards dated over the last three weeks and sorted into three [swimlanes](#swimlanes).
 

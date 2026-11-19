@@ -266,7 +266,7 @@ test('attachments: upload, list, log, serve safely, refuse cross-site and unsafe
   assert.equal((await upload('fix-bug.md', 'x.txt', 'x', { 'content-type': 'text/plain' })).status, 403);
   assert.equal((await upload('missing.md', 'x.txt', 'x')).status, 404);
   assert.equal((await upload('fix-bug.md', '', 'x')).status, 400);
-  const tooLarge = await new Promise<number | undefined>((resolve, reject) => {
+  const tooLarge = await new Promise<number | undefined>((resolve) => {
     const req = http.request(`${base}/api/cards/fix-bug.md/attachments?name=big.bin`, { method: 'POST', headers: { 'x-markanban': '1', 'content-length': String(60_000_000) } },
       (r) => { r.resume(); resolve(r.statusCode); });
     req.on('error', () => resolve(413)); // the server may hang up before the body is sent

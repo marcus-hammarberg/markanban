@@ -2,7 +2,7 @@
 
 A kanban board driven by a folder of markdown files. Point it at a folder and you're done.
 
-```
+```sh
 npx markanban [folder]     # folder defaults to .
 ```
 
@@ -49,7 +49,7 @@ Users get logged out after 5 minutes.
 ### Fields (all optional)
 
 | Field | Meaning |
-|---|---|
+| --- | --- |
 | `heading` | Card title. Fallback chain: `heading` → first `# H1` in body → filename (`fix-login-bug.md` → "fix login bug"). |
 | `status` | Column. Missing → "No status" column (renamable via config). |
 | `type` | Free text. |
@@ -73,7 +73,7 @@ Users get logged out after 5 minutes.
 
 The last section of the file, `## Changelog`, is a list. Newest last, append-only. Markanban-written headings (`## Comments`, `### <comment>`, `## Changelog`) always have a blank line after them (markdownlint MD022); older files are upgraded on the next write to those sections.
 
-```
+```text
 - <ISO 8601 UTC timestamp> <who> <field>: <from> → <to>
 ```
 
@@ -90,6 +90,7 @@ The last section of the file, `## Changelog`, is a list. Newest last, append-onl
 Columns = distinct `status` values across **active** (non-archived) cards.
 
 Order:
+
 1. `columns` in `.markanban.yml`, if present
 2. then the common order: `backlog, todo, ready, doing, in progress, review, done` (case-insensitive)
 3. then the remaining statuses alphabetically
@@ -112,6 +113,7 @@ types:                    # optional: type → color, see Type colors
 ## UI (v1)
 
 Actions:
+
 - Move cards between columns (drag & drop)
 - Create card
 - Edit front-matter fields (known fields; unknown are read-only)
@@ -156,7 +158,7 @@ Every card has a link, so it can be pasted into chat, a ticket or a note. Client
 - The address bar follows the dialog: opening a card (click, Enter or link) sets the hash, closing it clears the hash. Back/Forward therefore open and close cards.
 - Arriving on a link opens the card once the board has loaded, and again on every hash change.
 - Archived cards open even when "Show archived" is off; filters never affect the dialog.
-- A link to a card that doesn't exist shows "No card <name>" in the error banner and clears the hash. It is checked on load and on hash change, not on live updates, so the dialog can't reopen after being closed.
+- A link to a card that doesn't exist shows "No card `<name>`" in the error banner and clears the hash. It is checked on load and on hash change, not on live updates, so the dialog can't reopen after being closed.
 - Changing the link while the dialog is open switches cards without asking, like Esc, which also drops unsaved edits.
 - The 🔗 button sits in the dialog header, left of ✕, and copies the full URL. It shows "✓ Copied" for about 1.5 s. If the clipboard is refused, the link is shown in the error banner instead. Board cards carry no link icon.
 - A failed save reopens the dialog with the typed values and restores the hash.
@@ -205,7 +207,7 @@ Cards are color-coded by `type`: a 4px stripe on the left edge plus a tinted typ
 - Built-in defaults (no config needed):
 
   | Color | Types |
-  |---|---|
+  | --- | --- |
   | red | bug, defect, incident |
   | orange | epic |
   | yellow | spike, research |
@@ -233,16 +235,19 @@ Cards are color-coded by `type`: a 4px stripe on the left edge plus a tinted typ
 A separate, read-only mode that plays back how cards moved across the board over time.
 
 **Modes**
+
 - Normal board: unchanged, plus one "▶ Replay" button in the header. No replay controls are visible.
 - Replay mode: entered via that button. Board is read-only (no drag, no `+` buttons, no "+ Column", no card dialog, no "Show archived"; `#card=` links are ignored), live file updates are held until exit. The filter row stays, so you can replay a subset (e.g. one assignee). A control bar appears: play/pause, timeline slider, replayed date/time clock, Exit.
 - Replay mode is unmistakable: the control bar starts with "● Replay · read-only" and is accent-tinted, the board gets an accent tint and frame, cards show a not-allowed cursor and a "Read-only during replay" tooltip, and pressing a card makes the Exit button pulse.
 - Exit returns to the live board (loading any held updates) and removes the control bar.
 
 **Playback**
+
 - Starts at the beginning and plays at a fixed **8 hours per second**. No speed selector: drag the timeline slider to go faster, slower or backwards. Stops at the end; Play again restarts from the beginning.
 - The timeline runs from the earliest event to the moment the board was loaded.
 
 **Data (no extra file reads, no file changes)**
+
 - The server builds the timeline from the changelogs it already reads (`replay()` in `src/board.ts`, tested) and returns it as `replay` in `/api/board`: `{ start, end, columns, steps }`. `steps[<file name>]` is a list of `{ at, status, archived }` (`at` in ms), each in force from `at` until the next. The browser only plays it back.
 - A card appears at its earliest known time: `card: created` line → `created` field → file birthtime (or its first logged change, if earlier).
 - Its starting column is the `from` of its first status change, else its current status.
@@ -251,17 +256,21 @@ A separate, read-only mode that plays back how cards moved across the board over
 - Other field changes are not replayed; cards show their current heading and fields.
 
 **Board**
+
 - `columns` lists every status the timeline uses, plus the current columns, ordered by the normal column rules ("No status" first). Current columns always show; statuses no longer in use appear only while they hold cards.
 - Only active cards are shown; archived ones are hidden.
 - Moving cards slide between columns (Web Animations API, no dependency). New cards fade in, archived fade out. A new change restarts animations from wherever the cards are, so they never lag the clock. No animation when the OS asks for reduced motion.
 
 **Card order**
+
 - Ranks aren't logged, so order changes can't be replayed; cards in a replayed column are shown in their current order.
 
 **Demo board**
+
 - `npm run demo [folder]` (`src/demo.ts`, default `demo-board`) writes a board telling how Markanban was built: the real commit order, stretched over three weeks and dated back from today so the story ends just now. Cards sit in three lane folders (`1 Cards & files`, `2 Board`, `3 Sharing & release`) with the newest at the top level, and one card has a logged lane move. Cards are written with `newCard`/`applyChange`, exactly as the UI would. Refuses a folder that isn't new or empty; never overwrites. A dev script, not part of the CLI.
 
 **Known gap (accepted)**
+
 - Edits made outside the UI aren't in the changelog, so such a card jumps to its current state at the end. Replay is only as complete as the changelog.
 
 ### Swimlanes
@@ -269,12 +278,14 @@ A separate, read-only mode that plays back how cards moved across the board over
 Lanes are horizontal rows that share one set of columns. A lane is a folder in the board folder; there is no config.
 
 **Which folders are lanes**
+
 - A visible folder `X/` directly in the board folder is a lane, unless `X.md` sits next to it (then it is that card's attachment folder). Lane cards are the `*.md` files directly in it, with the same rules as top-level cards; a lane card's attachments are in `X/<card>/`.
 - A folder is a lane only while it holds at least one card file (archived ones count). Folders without cards (`images/`, orphan attachment folders) are not shown and give no warning.
 - One level only. A folder inside a lane that isn't a lane card's attachment folder is ignored; if it holds `*.md` files, a warning says they are not shown.
 - A hand-made `X.md` next to a lane folder `X/` that holds cards turns that folder into its attachment folder; a warning names both. New cards from the UI never take a name whose folder already holds files (`frontend-2.md`).
 
 **Board**
+
 - No lanes: the board looks exactly as before.
 - With lanes, top-level cards form the first lane, without a header, shown only when it has active cards. Named lanes follow in natural, case-insensitive name order (`lane 2` before `lane 10`); the label is the folder name as written. Order them with a prefix such as `1 Frontend`.
 - Column headers show once, at the top. Each named lane has a full-width header with its name and active card count. Archived cards share one Archived column.
@@ -283,6 +294,7 @@ Lanes are horizontal rows that share one set of columns. A lane is a folder in t
 - `/api/board` returns `lanes` (named lanes in order, with `null` first when top-level cards are shown) and each card's `lane` (folder name or `null`).
 
 **Moving between lanes**
+
 - Lanes are created and removed in the file system only. The UI moves cards between lanes that exist.
 - Dragging a card into another lane's cell moves it there (and to that column). The keyboard moves within the card's lane cell; Alt+↓ on the bottom card of a cell moves it to the top of the same column in the next lane, Alt+↑ on the top card to the bottom of the previous lane (the top-level lane counts as the first), so the opposite key undoes it.
 - A move renames the card file into the target folder and moves its attachment folder with it (folder first; if the card can't follow, the folder is moved back). It is logged as `lane: (none) → frontend`. The browser sends `lane: <name> | null` on `PATCH /api/cards/:name`; the server checks the lane exists.
@@ -296,30 +308,36 @@ Lanes are horizontal rows that share one set of columns. A lane is a folder in t
 Every file in a sibling folder named after the card file is an attachment: `fix-login-bug.md` → `fix-login-bug/`. The folder is the truth, so files dropped in by hand count too. Card filenames never change, so the link can't break, and a relative body link (`fix-login-bug/shot.png`) works in any markdown viewer.
 
 **Dialog**
+
 - An "Attachments (n)" section below the body, above Comments. Collapsed by default, like Comments and History; opens after an upload.
 - One link per file, filename only, opening in a new tab. No previews, no sizes.
 - Hidden while creating a card (no file yet, so no folder name).
 - Cards show a 📎 count. Search matches attachment filenames.
 
 **Upload**
+
 - An "Add file" button (native file input), dropping a file anywhere on the dialog, or pasting when the clipboard holds a file (pasting text still works as before).
 - The folder is created on the first upload. The original name is kept; on collision `-2`, `-3`… (the same logic as new card filenames). Never overwrites. Names are sanitized: no path, no leading `.`, no control characters.
 - Raw request body with a required `X-Markanban: 1` header (the CSRF guard for uploads: a cross-site page can't send it without a CORS preflight, which is never answered). Max 50 MB. Streamed to a temp file, then renamed into place.
 - Logs `attachment: added <name>` in the changelog. The file is saved first; if the log line fails, the upload stays and a warning is shown. Files added by hand are not logged. Replay ignores these lines.
 
 **Serving**
+
 - Only png, jpg, gif and webp are shown inline; everything else is sent as `Content-Disposition: attachment`. Every response has `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox`, so an `.html` or `.svg` attachment can't run script against the API.
 - `GET /api/cards/<card>/attachments/<file>` serves a file; `POST /api/cards/<card>/attachments?name=<file name>` uploads one and returns `{ name }` (plus `warning` if the log line failed).
 - Paths are `[<lane>/]<card>/<file>` only: no `..`, no hidden files. Checked in `storage.ts`.
 
 **Live updates and storage**
+
 - The 3-second poll also checks each card folder and each lane folder (names, sizes, mtimes; no contents).
 - `storage.ts` gets `listAttachments`, `readAttachment` and `writeAttachment`, so a Drive/hosted backend still replaces one module.
 
 **Edge cases (accepted)**
+
 - Archiving leaves the folder alone. A card file renamed or deleted by hand leaves an orphan folder, which is ignored and never touched. A sync-conflict copy (`name (1).md`) has no attachments of its own.
 
 **Not included**
+
 - Removing attachments in the UI (remove the file yourself), previews or thumbnails, inserting links into the body.
 
 ## Tech

@@ -1,7 +1,7 @@
 // A card is a markdown file: optional YAML front-matter, a body, and an optional
 // trailing "## Changelog" section. All edits are targeted text edits so whatever
 // the user wrote (comments, key order, unknown fields, line endings) survives.
-import { parseDocument, isSeq, YAMLSeq, type Document } from 'yaml';
+import { parseDocument, isSeq, type YAMLSeq, type Document } from 'yaml';
 
 export const KNOWN = ['heading', 'status', 'type', 'assignee', 'tags', 'created', 'archived', 'rank'] as const;
 export const EDITABLE = ['heading', 'status', 'type', 'assignee', 'tags'];

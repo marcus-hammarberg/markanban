@@ -1,0 +1,4 @@
+#!/bin/sh
+# Trunk-based: commits go straight to main, so check before they leave this machine.
+# Enable once per clone: git config core.hooksPath .githooks   (skip in an emergency: git push --no-verify)
+exec npm run check --silent

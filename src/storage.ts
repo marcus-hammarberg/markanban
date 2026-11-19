@@ -49,6 +49,7 @@ async function scan(dir: string) {
 export function attachmentName(name: string) {
   const base = name.split(/[\\/]/).pop() ?? '';
   // Control characters and characters Windows (or a synced share) can't store become '-'; no hidden files.
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching control characters is the point (they are stripped)
   const clean = base.replace(/[\u0000-\u001f\u007f:*?"<>|]/g, '-').replace(/^[.\s]+/, '').trim();
   return clean || 'file';
 }
@@ -61,6 +62,7 @@ export function createStorage(root: string) {
   // A card is `<card>.md` or `<lane>/<card>.md`: plain visible names, nothing deeper, no ../ or \.
   const cardPath = (name: string) => {
     const parts = name.split('/');
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters in a path are refused on purpose
     const plain = (p: string) => p !== '' && !p.startsWith('.') && !/[\\\u0000-\u001f]/.test(p);
     if (parts.length > 2 || !parts.every(plain) || !isCardName(parts[parts.length - 1])) throw invalid(name);
     const full = path.join(dir, name);
