@@ -17,8 +17,8 @@ Markanban is a kanban board driven by a folder of markdown files. `SPEC.md` is t
 
 - New features are designed into `SPEC.md` first. A "Proposed" section is a plan, not a task: build it only when the user asks.
 - Test-first for logic in `src/` (`node:test`, `npm test`; one file: `node --test src/card.test.ts`). Every rule that can lose or corrupt user data gets a test.
-- Trunk-based: changes are committed straight to `main`. `npm run check` (lint, `tsc --noEmit`, tests) must pass before pushing; the pre-push hook in `.githooks/` runs it (enable once per clone: `git config core.hooksPath .githooks`), and the Check workflow runs it again on every push to `main`.
-- `npm run lint` is part of that: Biome for `src/` and `public/` (lint only, the formatter is off), markdownlint for the repo's `.md` files (config in `biome.json` and `.markdownlint-cli2.jsonc`). Fix findings; silence one only with a `biome-ignore` comment that says why.
+- Trunk-based: changes are committed straight to `main`. `npm run check` (lint, type check of `src/` including tests via `tsconfig.check.json`, tests) must pass before pushing; the pre-push hook in `.githooks/` runs it (enable once per clone: `git config core.hooksPath .githooks`). The Check workflow runs it again on every push to `main` on Linux, macOS and Windows, Node 22.18 and 24, then smoke-tests the built `dist/` (what `npx` runs). Dependabot proposes weekly npm and action updates.
+- `npm run lint` is part of that: Biome for `src/` and `public/` (lint only, the formatter is off), markdownlint for the repo's `.md` files, and fallow for unused code (files, exports, dependencies) and duplication (config in `biome.json`, `.markdownlint-cli2.jsonc` and `.fallowrc.jsonc`). Export only what another module imports. `npx fallow health` reports complexity hotspots; it is advice, not a gate. Fix findings; silence one only with a `biome-ignore` comment that says why.
 - Check UI changes in a real browser against a scratch board folder, both light and dark theme. Leave the user's own board files as you found them.
 - Commit only when the user asks.
 

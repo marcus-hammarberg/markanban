@@ -203,7 +203,7 @@ test('card order: the browser says where, the server ranks, sorts and never logs
   assert.deepEqual(await order('todo'), ['d.md', 'b.md', 'c.md', 'a.md']);
 });
 
-test('unreadable cards are skipped with a warning; editing keeps the card date', { skip: process.getuid?.() === 0 }, async (t) => {
+test('unreadable cards are skipped with a warning; editing keeps the card date', { skip: process.getuid?.() === 0 || process.platform === 'win32' } /* root reads anything; Windows ignores chmod */, async (t) => {
   const dir = await mkdtemp(path.join(tmpdir(), 'markanban-'));
   await writeFile(path.join(dir, 'ok.md'), 'fine');
   await writeFile(path.join(dir, 'locked.md'), 'secret');

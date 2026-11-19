@@ -17,8 +17,8 @@
     "build": "tsc",
     "prepare": "tsc",
     "test": "node --test \"src/**/*.test.ts\"",
-    "lint": "biome lint && markdownlint-cli2",
-    "check": "npm run lint && tsc --noEmit && npm test",
+    "lint": "biome lint && markdownlint-cli2 && fallow dead-code && fallow dupes --fail-on-issues",
+    "check": "npm run lint && tsc -p tsconfig.check.json && npm test",
     "start": "node src/cli.ts",
     "demo": "node src/demo.ts"
   },
@@ -29,6 +29,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
     "@types/node": "^26.6.6",
+    "fallow": "3.42.0",
     "markdownlint": "0.42.1",
     "markdownlint-cli2": "0.24.1",
     "typescript": "^7.0.2"

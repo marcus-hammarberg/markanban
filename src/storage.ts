@@ -6,7 +6,7 @@ import { CONFIG_FILE } from './board.ts';
 
 export interface StoredFile { name: string; text: string; created: string; mtime: string }
 
-export function isCardName(name: string) {
+function isCardName(name: string) {
   return /\.md$/i.test(name) && !name.startsWith('.') && name.toLowerCase() !== 'readme.md';
 }
 
@@ -168,7 +168,7 @@ export function createStorage(root: string) {
      * Streams to a hidden temp file, then claims a free name (`shot.png`, `shot-2.png`, …) and renames
      * into place. Never overwrites. Returns the name used; a failed upload leaves nothing behind.
      */
-    async writeAttachment(card: string, wanted: string, data: AsyncIterable<Buffer>): Promise<string> {
+    async writeAttachment(card: string, wanted: string, data: AsyncIterable<Buffer> | Iterable<Buffer>): Promise<string> {
       const folder = attachmentPath(card);
       const name = attachmentName(wanted);
       await mkdir(folder, { recursive: true });

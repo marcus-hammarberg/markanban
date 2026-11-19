@@ -8,7 +8,7 @@ export const CONFIG_FILE = '.markanban.yml';
 const COMMON = ['backlog', 'todo', 'ready', 'doing', 'in progress', 'review', 'done'];
 
 // Color names, not hex: each theme defines its own shade (--type-<name>) so colors fit light/dark/etc.
-export const PALETTE = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'grey'] as const;
+const PALETTE = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'grey'] as const;
 export type Color = (typeof PALETTE)[number];
 
 const BUILT_IN: Record<string, Color> = {
@@ -169,7 +169,7 @@ export function placeCard(column: Rankable[], before: string | null): { rank: nu
 
 // ---- Replay: how cards moved over time, rebuilt from their changelogs ----
 
-export interface Step { at: number; status: string | null; archived: boolean } // state from `at` (ms) on
+interface Step { at: number; status: string | null; archived: boolean } // state from `at` (ms) on
 export interface ReplayCard { name: string; status: string | null; archived: string | null; created: string; history: string[] }
 
 // The name never contains ": ", so a heading or file name that mentions "status: a → b" can't pass for a change.

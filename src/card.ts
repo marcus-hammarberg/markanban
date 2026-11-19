@@ -3,8 +3,8 @@
 // the user wrote (comments, key order, unknown fields, line endings) survives.
 import { parseDocument, isSeq, type YAMLSeq, type Document } from 'yaml';
 
-export const KNOWN = ['heading', 'status', 'type', 'assignee', 'tags', 'created', 'archived', 'rank'] as const;
-export const EDITABLE = ['heading', 'status', 'type', 'assignee', 'tags'];
+const KNOWN = ['heading', 'status', 'type', 'assignee', 'tags', 'created', 'archived', 'rank'] as const;
+const EDITABLE = ['heading', 'status', 'type', 'assignee', 'tags'];
 
 export interface Card {
   name: string; // path in the board folder: `fix-bug.md`, or `frontend/fix-bug.md` in a lane

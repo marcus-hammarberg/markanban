@@ -1,0 +1,5 @@
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  // The browser UI is served by the server (src/server.ts serveStatic), not imported by any module.
+  "dynamicallyLoaded": ["public/**/*.js", "public/**/*.css"]
+}
