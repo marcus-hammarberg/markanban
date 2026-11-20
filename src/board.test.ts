@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { orderColumns, orderLanes, parseConfig, placeCard, rankOrder, replay, setConfigColumns, typeColor } from './board.ts';
+import { orderColumns, orderLanes, parseConfig, placeCard, rankOrder, replay, setConfigColumns, typeColor, wipLimit } from './board.ts';
 
 test('common order first, then alphabetical', () => {
   assert.deepEqual(orderColumns(['zeta', 'Done', 'alpha', 'todo', 'In Progress'], []), ['todo', 'In Progress', 'Done', 'alpha', 'zeta']);
@@ -15,9 +15,9 @@ test('no duplicates', () => {
 });
 
 test('valid config parses without warnings', () => {
-  assert.deepEqual(parseConfig(''), { columns: [], noStatusColumn: 'No status', types: {}, warnings: [] });
-  assert.deepEqual(parseConfig('columns: [a, b]\nnoStatusColumn: Inbox\ntypes:\n  Incident : red\n'),
-    { columns: ['a', 'b'], noStatusColumn: 'Inbox', types: { incident: 'red' }, warnings: [] });
+  assert.deepEqual(parseConfig(''), { columns: [], noStatusColumn: 'No status', types: {}, wip: {}, warnings: [] });
+  assert.deepEqual(parseConfig('columns: [a, b]\nnoStatusColumn: Inbox\ntypes:\n  Incident : red\nwip:\n  " Doing ": 3\n'),
+    { columns: ['a', 'b'], noStatusColumn: 'Inbox', types: { incident: 'red' }, wip: { doing: 3 }, warnings: [] });
 });
 
 test('config problems: skip the broken part, fall back, warn with valid values', () => {
@@ -52,7 +52,23 @@ test('type colors: config wins, then built-in list, else none; case and spaces i
 test('setting columns keeps other keys and comments', () => {
   const out = setConfigColumns('# mine\nnoStatusColumn: Inbox\n', ['b', 'a']);
   assert.match(out, /# mine/);
-  assert.deepEqual(parseConfig(out), { columns: ['b', 'a'], noStatusColumn: 'Inbox', types: {}, warnings: [] });
+  assert.deepEqual(parseConfig(out), { columns: ['b', 'a'], noStatusColumn: 'Inbox', types: {}, wip: {}, warnings: [] });
+});
+
+test('wip limits: whole numbers >= 1 only, anything else skipped with a warning', () => {
+  const c = parseConfig('wip:\n  doing: 3\n  review: 0\n  test: -1\n  qa: 2.5\n  ux: three\n  ops:\n  todo: "4"\n');
+  assert.deepEqual(c.wip, { doing: 3 });
+  assert.equal(c.warnings.length, 6);
+  assert.match(c.warnings[0], /wip for "review" must be a whole number of 1 or more, e.g. wip: \{ doing: 3 \}/);
+  assert.match(parseConfig('wip: [doing]\n').warnings[0], /wip must be a map of column to limit/);
+  assert.match(parseConfig('wip: 3\n').warnings[0], /wip must be a map/);
+});
+
+test('wip limit is found by column label, ignoring case and spaces', () => {
+  assert.equal(wipLimit('Doing', { doing: 3 }), 3);
+  assert.equal(wipLimit(' INBOX ', { inbox: 10 }), 10);
+  assert.equal(wipLimit('review', { doing: 3 }), null);
+  assert.equal(wipLimit('constructor', {}), null);
 });
 
 const card = (name: string, rank: number | null, created = '2026-01-01T00:00:00Z') => ({ name, rank, created });
@@ -95,7 +111,7 @@ const END = Date.parse('2026-12-01T00:00:00Z');
 const t = (iso: string) => Date.parse(iso);
 const rc = (over: Partial<Parameters<typeof replay>[0][number]>) =>
   ({ name: 'a.md', status: null, archived: null, created: '2026-11-01T00:00:00Z', history: [], ...over });
-const cfg = { columns: [], noStatusColumn: 'No status' };
+const cfg = { columns: [], noStatusColumn: 'No status', wip: {} };
 
 test('replay: a card appears at card: created and starts in the from of its first status change', () => {
   const r = replay([rc({ status: 'done', created: '2026-11-05T00:00:00Z', history: [
@@ -160,13 +176,13 @@ test('replay: columns cover every status ever used, in normal column order, no s
   const r = replay([
     rc({ name: 'a.md', status: 'done', history: ['2026-11-02T00:00:00Z m status: zeta → done'] }),
     rc({ name: 'b.md', status: 'todo', history: ['2026-11-02T00:00:00Z m status: (none) → todo'] }),
-  ], ['review'], { columns: ['review'], noStatusColumn: 'Inbox' }, END);
+  ], ['review'], { columns: ['review'], noStatusColumn: 'Inbox', wip: { todo: 2 } }, END);
   assert.deepEqual(r.columns, [
-    { key: null, label: 'Inbox', current: false },
-    { key: 'review', label: 'review', current: true },
-    { key: 'todo', label: 'todo', current: false },
-    { key: 'done', label: 'done', current: false },
-    { key: 'zeta', label: 'zeta', current: false },
+    { key: null, label: 'Inbox', current: false, limit: null },
+    { key: 'review', label: 'review', current: true, limit: null },
+    { key: 'todo', label: 'todo', current: false, limit: 2 },
+    { key: 'done', label: 'done', current: false, limit: null },
+    { key: 'zeta', label: 'zeta', current: false, limit: null },
   ]);
 });
 

@@ -26,14 +26,16 @@ export interface Config {
   columns: string[];
   noStatusColumn: string;
   types: Record<string, Color>;
+  /** WIP limit per column, keyed by the lowercased, trimmed column label. */
+  wip: Record<string, number>;
   warnings: string[];
 }
 
-const normType = (t: string) => t.trim().toLowerCase();
+const norm = (t: string) => t.trim().toLowerCase();
 const isColor = (c: string): c is Color => (PALETTE as readonly string[]).includes(c);
 
 export function parseConfig(text: string): Config {
-  const config: Config = { columns: [], noStatusColumn: 'No status', types: {}, warnings: [] };
+  const config: Config = { columns: [], noStatusColumn: 'No status', types: {}, wip: {}, warnings: [] };
   const warn = (msg: string) => config.warnings.push(`${CONFIG_FILE}: ${msg}`);
 
   const doc = parseDocument(text);
@@ -67,18 +69,35 @@ export function parseConfig(text: string): Config {
     } else {
       for (const [type, value] of Object.entries(types)) {
         const color = String(value).trim().toLowerCase();
-        if (isColor(color)) config.types[normType(type)] = color;
+        if (isColor(color)) config.types[norm(type)] = color;
         else warn(`unknown color "${value}" for type "${type}". Use one of: ${PALETTE.join(', ')}`);
+      }
+    }
+  }
+
+  if (data.wip !== undefined) {
+    const wip = data.wip;
+    if (wip === null || typeof wip !== 'object' || Array.isArray(wip)) {
+      warn('wip must be a map of column to limit, e.g. wip: { doing: 3 }');
+    } else {
+      for (const [column, value] of Object.entries(wip)) {
+        if (Number.isInteger(value) && (value as number) >= 1) config.wip[norm(column)] = value as number;
+        else warn(`wip for "${column}" must be a whole number of 1 or more, e.g. wip: { doing: 3 }`);
       }
     }
   }
   return config;
 }
 
+/** A column's WIP limit, found by its label as shown on the board (case and spaces ignored). */
+export function wipLimit(label: string, wip: Record<string, number>): number | null {
+  return Object.hasOwn(wip, norm(label)) ? wip[norm(label)] : null;
+}
+
 /** Configured color first, then the built-in list; unknown or missing type gets no color. */
 export function typeColor(type: string | null, configured: Record<string, Color>): Color | null {
   if (!type) return null;
-  const t = normType(type);
+  const t = norm(type);
   return configured[t] ?? BUILT_IN[t] ?? null;
 }
 
@@ -208,7 +227,7 @@ function cardSteps(card: ReplayCard, end: number): Step[] {
 }
 
 /** Everything the browser needs to play the board back from the first event to `end`. */
-export function replay(cards: ReplayCard[], current: (string | null)[], config: { columns: string[]; noStatusColumn: string }, end: number) {
+export function replay(cards: ReplayCard[], current: (string | null)[], config: { columns: string[]; noStatusColumn: string; wip: Record<string, number> }, end: number) {
   const steps = Object.fromEntries(cards.map((c) => [c.name, cardSteps(c, end)]));
   const all = Object.values(steps).flat();
   const statuses = all.flatMap((s) => (s.status === null ? [] : [s.status]));
@@ -217,7 +236,10 @@ export function replay(cards: ReplayCard[], current: (string | null)[], config: 
   return {
     start: Math.min(end, ...all.map((s) => s.at)),
     end,
-    columns: keys.map((key) => ({ key, label: key ?? config.noStatusColumn, current: current.includes(key) })),
+    columns: keys.map((key) => {
+      const label = key ?? config.noStatusColumn;
+      return { key, label, current: current.includes(key), limit: wipLimit(label, config.wip) };
+    }),
     steps,
   };
 }

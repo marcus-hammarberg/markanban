@@ -108,6 +108,8 @@ columns: [backlog, todo, doing, review, done]
 noStatusColumn: Inbox     # default: "No status"
 types:                    # optional: type → color, see Type colors
   incident: orange
+wip:                      # optional: column → WIP limit, see WIP limits
+  doing: 3
 ```
 
 ## UI (v1)
@@ -171,6 +173,25 @@ A row above the board: free-text search (heading, body, comments, attachment nam
 ### Column reordering
 
 Drag a column by its header (⠿ grip) and drop it on either half of another column, or use the ‹ › buttons shown on hover/focus. The order is saved to `.markanban.yml`. "No status" is always first.
+
+### WIP limits
+
+A column can have a work-in-progress limit. It is a board-level fact, so it lives in `.markanban.yml` (card statuses stay plain, e.g. `doing`), set by hand only:
+
+```yaml
+wip:
+  doing: 3
+  review: 2
+```
+
+- The key is the column name as shown on the board, matched ignoring case and surrounding spaces. That includes the "No status" column under its `noStatusColumn` name. Archived is not a status and has no limit. If two statuses differ only in case, each gets the limit on its own.
+- One limit per column, counting the active cards in it across all lanes. Archived cards never count. Filters don't change the count: the limit is about the team's system, not one person's view.
+- The value must be a whole number ≥ 1. Anything else (`0`, `-1`, `2.5`, `three`, empty) skips that entry with a warning; to remove a limit, remove the line. A `wip` that isn't a map is skipped with a warning. Names that match no current column are ignored silently (an emptied column isn't a typo).
+- Header of a limited column: `count / limit` (e.g. `3 / 3`), always the unfiltered count. Columns without a limit keep showing the filtered count.
+- At the limit is the goal, so it looks normal. Over the limit (`4 / 3`), the whole column (header and every lane cell) gets the `--wip-over` theme tint and the header shows ⚠ (U+26A0, text, not emoji) with the label "over WIP limit" (tooltip and screen readers), so color is never the only signal.
+- Limits never block: moves into a full column always go through, and hand edits can push a column over anyway. The warning is the signal; acting on it is the team's call.
+- `/api/board` returns `limit` (number or `null`) and `count` on each column; the browser only shows them.
+- Replay shows the limits too, with the count of replayed cards at that moment (all cards, ignoring the filter), tinting the column whenever it went over: a signal for retrospectives. It uses today's limits, because config changes aren't logged.
 
 ### Live updates & safe writes
 
@@ -370,5 +391,5 @@ Sharing a board = putting the folder in a sync client's folder (Google Drive for
 - Board-level default theme in `.markanban.yml`
 - `.markanban.yml` in the run folder pointing at a board folder
 - Editing unknown fields in the UI
-- WIP limits by column name convention, e.g. `doing (3)`: the number caps the cards in that column and the header warns when it is exceeded
+- WIP limits: setting a limit in the UI; per-lane limits
 - Blocker marker on a card (e.g. a `blocked` field holding the reason), shown prominently on the board

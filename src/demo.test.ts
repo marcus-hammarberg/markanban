@@ -13,7 +13,7 @@ test('demo board: every card parses and replays to its current state, ending jus
   assert.ok(cards.length > 15);
   for (const c of cards) assert.equal(c.error, undefined, c.name);
 
-  const r = replay(cards, [], { columns: [], noStatusColumn: 'No status' }, now);
+  const r = replay(cards, [], { columns: [], noStatusColumn: 'No status', wip: {} }, now);
   assert.ok(r.start >= now - 21 * 86_400_000);
   for (const [name, steps] of Object.entries(r.steps)) {
     // No jump at the end: the changelog alone tells the whole story.

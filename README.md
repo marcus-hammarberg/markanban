@@ -66,6 +66,18 @@ Columns come from the statuses on your cards, so a new status gives you a new co
 
 To change the order, drag a column by its header (⠿), or hover over the header and use the ‹ › buttons. Your order is saved in `.markanban.yml`, and columns listed there stay visible even when they're empty. A column also stays when you move or archive its last card on the board. Use **+ Column** to add a new one, or drop a card on it to give the card a new status.
 
+### WIP limits
+
+Give a column a work-in-progress limit in `.markanban.yml`:
+
+```yaml
+wip:
+  doing: 3
+  review: 2
+```
+
+The column header then shows `2 / 3`: every card in the column, in all swimlanes, against the limit. Filters don't change that number, and archived cards don't count. When a column goes over its limit, it turns red and the header shows ⚠. You can still move cards into it; the limit is a signal for the team, not a lock. Replay shows when columns went over (against today's limits), which is handy in a retrospective.
+
 ## Swimlanes
 
 Swimlanes are rows across the board, one per folder, all sharing the same columns. To add one, create a folder in the board folder and put (or move) a card file into it:
@@ -150,6 +162,8 @@ noStatusColumn: Inbox                           # name of the "No status" column
 types:                                          # colors per type
   incident: orange
   ops: pink
+wip:                                            # WIP limit per column
+  doing: 3
 ```
 
 Colors: `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`, `grey`. If something in the file is wrong, the board still works and shows a warning telling you what to fix.

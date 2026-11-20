@@ -21,7 +21,7 @@ test('API: create, move, archive, reorder, and refuse unsafe requests', async (t
 
   let board = await (await call('GET', '/api/board')).json();
   assert.deepEqual(board.cards.map((c: { name: string }) => c.name), ['loose.md']);
-  assert.deepEqual(board.columns, [{ key: null, label: 'No status' }]);
+  assert.deepEqual(board.columns, [{ key: null, label: 'No status', limit: null, count: 1 }]);
 
   assert.equal((await call('POST', '/api/cards', { heading: 'Fix bug', status: 'todo' })).status, 201);
   assert.equal((await (await call('POST', '/api/cards', { heading: 'Fix bug' })).json()).name, 'fix-bug-2.md');
@@ -46,6 +46,15 @@ test('API: create, move, archive, reorder, and refuse unsafe requests', async (t
   assert.equal(color('loose.md'), null);
   assert.equal(board.warnings.length, 1);
   assert.match(board.warnings[0], /unknown color "reddish"/);
+
+  // WIP limits: matched by column label, counting active cards (archived loose.md doesn't count).
+  await writeFile(path.join(dir, '.markanban.yml'), 'wip:\n  Doing: 1\n  no status: 5\n  gone: 2\n');
+  board = await (await call('GET', '/api/board')).json();
+  assert.deepEqual(board.columns, [
+    { key: null, label: 'No status', limit: 5, count: 1 },
+    { key: 'doing', label: 'doing', limit: 1, count: 1 },
+  ]);
+  assert.deepEqual(board.warnings, [], 'a limit for a column that does not exist is ignored silently');
 
   // Replay: the server turns changelogs into steps; the browser only plays them.
   const steps = board.replay.steps['fix-bug.md'];
@@ -313,6 +322,7 @@ test('lanes: cards in folders, moved by the board with their attachments, never 
   assert.deepEqual(board.lanes, [null, 'backend', 'frontend']);
   assert.deepEqual(board.cards.map((c: { name: string; lane: string | null }) => [c.name, c.lane]).sort(),
     [['backend/a.md', 'backend'], ['frontend/a.md', 'frontend'], ['frontend/b.md', 'frontend'], ['top.md', null]]);
+  assert.equal(board.columns.find((c: { key: string }) => c.key === 'todo').count, 3, 'the WIP count covers every lane');
 
   // Editing a lane card works like any other card.
   assert.equal((await patch('frontend/b.md', { fields: { status: 'review' } })).status, 200);

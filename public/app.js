@@ -387,6 +387,18 @@ function columnDropZone(el, key) {
   });
 }
 
+// A column with a WIP limit shows the server's count of all its active cards (filters don't change it)
+// against the limit; other columns show how many cards are visible. Over the limit warns in text, not just color.
+const wipOver = (limit, count) => limit !== null && count > limit;
+const columnClass = (limit, count) => `column${wipOver(limit, count) ? ' wip-over' : ''}`;
+
+function countEl(limit, count, shown) {
+  if (limit === null) return h('span', { class: 'count' }, String(shown));
+  const over = wipOver(limit, count);
+  return h('span', { class: 'count wip', title: over ? 'Over WIP limit' : 'WIP limit' },
+    over && h('span', { class: 'wip-warn', role: 'img', 'aria-label': 'over WIP limit' }, '\u26A0\uFE0E'), `${count} / ${limit}`);
+}
+
 function columnEl(col, cards) {
   const movable = col.key !== null;
   const keys = statusKeys();
@@ -404,7 +416,7 @@ function columnEl(col, cards) {
   },
   movable && h('span', { class: 'grip', 'aria-hidden': 'true' }, '⠿'),
   h('span', { class: 'title' }, col.label),
-  h('span', { class: 'count' }, String(cards.length)),
+  countEl(col.limit, col.count, cards.length),
   movable && h('span', { class: 'move' },
     h('button', { class: 'icon', title: 'Move left', 'aria-label': `Move ${col.label} left`, disabled: i === 0,
       onclick: () => reorderColumn(col.key, keys[i - 1], false) }, '‹'),
@@ -418,7 +430,7 @@ function columnEl(col, cards) {
     },
   }, '+'));
   const lanes = hasLanes();
-  const el = h('section', { class: 'column' }, head, lanes
+  const el = h('section', { class: columnClass(col.limit, col.count) }, head, lanes
     ? laneCells(cards, true, (cell, lane) => dropZone(cell, (name, before) => moveCard(name, col.key, before, lane), true))
     : cards.map((c) => cardEl(c)));
   if (!lanes) dropZone(el, (name, before) => moveCard(name, col.key, before), true);
@@ -677,21 +689,24 @@ function stepAt(steps = [], t) {
 function renderReplay() {
   const r = replaying;
   const byColumn = new Map(r.columns.map((c) => [c.key, []]));
-  for (const card of board.cards.filter(matches)) { // board order = current rank order (ranks aren't logged)
+  const all = new Map(r.columns.map((c) => [c.key, 0])); // WIP counts every replayed card, filtered or not
+  for (const card of board.cards) { // board order = current rank order (ranks aren't logged)
     const s = stepAt(r.steps[card.name], r.t);
-    if (s && !s.archived) byColumn.get(s.status)?.push(card);
+    if (!s || s.archived || !all.has(s.status)) continue;
+    all.set(s.status, all.get(s.status) + 1);
+    if (matches(card)) byColumn.get(s.status).push(card);
   }
   // Current columns always show; statuses no longer in use only while they hold cards.
   const cols = r.columns.filter((c) => c.current || byColumn.get(c.key).length);
-  const shown = JSON.stringify(cols.map((c) => [c.key, byColumn.get(c.key).map((card) => card.name)]));
+  const shown = JSON.stringify(cols.map((c) => [c.key, all.get(c.key), byColumn.get(c.key).map((card) => card.name)]));
   if (shown === r.shown) return; // nothing moved this frame
   r.shown = shown;
 
   const old = new Map([...boardEl.querySelectorAll('.card')].map((el) => [el.dataset.name, { el, rect: el.getBoundingClientRect() }]));
   // Cards stay in their current lane: lane moves aren't replayed.
-  const columnEls = cols.map((col) => h('section', { class: 'column' },
+  const columnEls = cols.map((col) => h('section', { class: columnClass(col.limit, all.get(col.key)) },
     h('div', { class: `column-head${col.key === null ? ' no-status' : ''}` },
-      h('span', { class: 'title' }, col.label), h('span', { class: 'count' }, String(byColumn.get(col.key).length))),
+      h('span', { class: 'title' }, col.label), countEl(col.limit, all.get(col.key), byColumn.get(col.key).length)),
     hasLanes() ? laneCells(byColumn.get(col.key), false) : byColumn.get(col.key).map((card) => cardEl(card, false))));
   boardEl.replaceChildren(...columnEls, ...laneHeads(columnEls, cols.flatMap((col) => byColumn.get(col.key))));
   if (calm.matches) return;

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyChange, newCard, parseCard, slug, type Change } from './card.ts';
-import { CONFIG_FILE, orderColumns, orderLanes, parseConfig, placeCard, rankOrder, replay, setConfigColumns, typeColor } from './board.ts';
+import { CONFIG_FILE, orderColumns, orderLanes, parseConfig, placeCard, rankOrder, replay, setConfigColumns, typeColor, wipLimit } from './board.ts';
 import type { Storage } from './storage.ts';
 
 const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
@@ -56,9 +56,13 @@ export function createServer(storage: Storage, user: string) {
       return { ...card, color: typeColor(card.type, config.types), attachments: await storage.listAttachments(f.name) };
     }))).sort(rankOrder); // within each column: priority order, top first
     const active = cards.filter((c) => !c.archived);
-    const columns = orderColumns(active.flatMap((c) => (c.status ? [c.status] : [])), config.columns)
-      .map((s) => ({ key: s as string | null, label: s }));
-    if (active.some((c) => !c.status)) columns.unshift({ key: null, label: config.noStatusColumn });
+    const keys: (string | null)[] = orderColumns(active.flatMap((c) => (c.status ? [c.status] : [])), config.columns);
+    if (active.some((c) => !c.status)) keys.unshift(null);
+    const columns = keys.map((key) => {
+      const label = key ?? config.noStatusColumn;
+      // WIP: every active card in the column, across lanes; the browser's filters don't change it.
+      return { key, label, limit: wipLimit(label, config.wip), count: active.filter((c) => (c.status || null) === key).length };
+    });
     const { warnings, ...settings } = config;
     warnings.push(...found, ...unreadable.map((u) => `${u.name} could not be read and is not shown (${u.message})`));
     return { folder: path.basename(storage.dir), user, config: settings, warnings, columns, lanes: orderLanes(cards), cards };

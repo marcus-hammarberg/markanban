@@ -16,6 +16,7 @@
   --chip-text: #34406b;
   --warn: #b45309;
   --danger: #c0392b;
+  --wip-over: #f8dedb;       /* column background when over its WIP limit */
   --shadow: 0 1px 2px rgb(0 0 0 / 0.08);
   --shadow-lift: 0 6px 16px rgb(0 0 0 / 0.12);
   --radius: 8px;
@@ -82,6 +83,10 @@ button.icon:hover { background: var(--surface); border-color: var(--border-stron
 .column-head { display: flex; align-items: center; gap: 6px; padding: 2px 4px; font-weight: 600; }
 .column-head[draggable="true"] { cursor: grab; }
 .column-head .count { color: var(--muted); font-weight: 400; }
+.column.wip-over { background: var(--wip-over); }
+.column.wip-over .column-head .count { color: var(--danger); font-weight: 600; }
+.column-head .count.wip { white-space: nowrap; }
+.column-head .wip-warn { margin-right: 4px; }
 .column-head .title { flex: 1; }
 .column-head.no-status .title { font-style: italic; color: var(--muted); }
 /* Swimlanes: columns stay one element each and line their lane cells up via subgrid; lane headers span the board. */

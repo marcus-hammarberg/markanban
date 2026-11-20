@@ -22,6 +22,7 @@
   --chip-text: #1f3a8a;
   --warn: #b45309;
   --danger: #c62828;
+  --wip-over: rgb(198 40 40 / 0.1);
   --shadow: 0 1px 2px rgb(0 0 0 / 0.08);
   --shadow-lift: 0 6px 16px rgb(0 0 0 / 0.14);
 
@@ -112,6 +113,8 @@
 :root[data-theme="whiteboard"] .column:nth-child(4n+2) { --ink: var(--ink-red); }
 :root[data-theme="whiteboard"] .column:nth-child(4n+3) { --ink: var(--ink-green); }
 :root[data-theme="whiteboard"] .column:nth-child(4n) { --ink: var(--ink-black); }
+:root[data-theme="whiteboard"] .column.wip-over { background: var(--wip-over); border-radius: var(--radius); }
+:root[data-theme="whiteboard"] .column.wip-over .column-head { --ink: var(--ink-red); }
 
 /* A wobbly marker line between columns */
 :root[data-theme="whiteboard"] .column + .column:not(.new-column)::before {
