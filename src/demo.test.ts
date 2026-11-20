@@ -3,13 +3,12 @@ import assert from 'node:assert/strict';
 import { demoBoard } from './demo.ts';
 import { parseCard } from './card.ts';
 import { lint } from 'markdownlint/sync';
-import { orderLanes, replay } from './board.ts';
+import { orderLanes, parseConfig, replay } from './board.ts';
 
 test('demo board: every card parses and replays to its current state, ending just before now', () => {
   const now = Date.parse('2026-11-18T12:00:00Z');
   const files = demoBoard(now);
-  assert.equal(files.get('.markanban.yml'), 'columns: [backlog, todo, doing, review, done]\n');
-  const cards = [...files].filter(([name]) => name.endsWith('.md')).map(([name, text]) => parseCard(text, { name, created: '', mtime: '' }));
+    const cards = [...files].filter(([name]) => name.endsWith('.md')).map(([name, text]) => parseCard(text, { name, created: '', mtime: '' }));
   assert.ok(cards.length > 15);
   for (const c of cards) assert.equal(c.error, undefined, c.name);
 
@@ -33,6 +32,30 @@ test('demo board: cards sit in lane folders, one stays at the top level, and one
   assert.equal(moved.length, 1);
   assert.match(moved[0].history.find((l) => l.includes(' lane: '))!, new RegExp(`lane: .+ → ${moved[0].lane}$`), 'logged move ends in the lane the file is in');
   assert.equal(cards.find((c) => c.heading === 'Swimlanes from subfolders')?.status, 'done');
+});
+
+test('demo board: Replay shows WIP limits, sometimes over, but not now', () => {
+  const now = Date.parse('2026-11-18T12:00:00Z');
+  const files = demoBoard(now);
+  const config = parseConfig(files.get('.markanban.yml')!);
+  assert.deepEqual(config.warnings, []);
+  assert.deepEqual(config.columns, ['backlog', 'todo', 'doing', 'review', 'done']);
+  assert.deepEqual(config.wip, { doing: 2, review: 1 });
+
+  const cards = [...files].filter(([name]) => name.endsWith('.md')).map(([name, text]) => parseCard(text, { name, created: '', mtime: '' }));
+  const r = replay(cards, [], config, now);
+  const steps = Object.values(r.steps);
+  const count = (status: string, t: number) => steps.filter((s) => {
+    const step = s.filter((x) => x.at <= t).at(-1);
+    return step && !step.archived && step.status === status;
+  }).length;
+  const times = [...new Set(steps.flat().map((s) => s.at))].sort((a, b) => a - b);
+  for (const [status, limit] of Object.entries(config.wip)) {
+    const over = times.filter((t) => count(status, t) > limit);
+    assert.ok(over.length > 0, `${status} goes over its limit at some point`);
+    assert.ok(over.length < times.length / 10, `${status} is over its limit only now and then`);
+    assert.ok(count(status, now) <= limit, `${status} is within its limit at the end`);
+  }
 });
 
 // The demo writes cards with the same functions as the board, so this guards every card Markanban writes.

@@ -2,6 +2,7 @@
 // The real commit order, stretched over three weeks and dated back from today so the story
 // always ends just now. Cards are written with newCard/applyChange, exactly like the UI does.
 // Cards sit in three lane folders (swimlanes); the newest card stays at the top level.
+// WIP limits (doing 2, review 1) are broken twice, briefly, so Replay shows what going over looks like.
 //
 //   npm run demo [folder]      # folder defaults to demo-board; must be new or empty
 import { mkdirSync, readdirSync } from 'node:fs';
@@ -56,7 +57,7 @@ const STORIES: Story[] = [
       [3.3, 'marcus', say('Spec written and decided. Not building it yet: the changelogs need to be complete first.')],
       [18.2, 'marcus', to('todo')],
       [18.3, 'marcus', { fields: { assignee: 'claude' } }],
-      ...flow(18.5, 20.2, 20.6, [[19.4, 'claude', say('Moved the timeline building to the server, where it can be tested. The browser only plays it back.')]]),
+      ...flow(18.5, 19.8, 20.6, [[19.4, 'claude', say('Moved the timeline building to the server, where it can be tested. The browser only plays it back.')]]),
     ],
   },
   {
@@ -119,19 +120,24 @@ const STORIES: Story[] = [
     heading: 'Links to cards', lane: BOARD, day: 12, who: 'marcus', status: 'backlog',
     fields: { type: 'feature', assignee: 'claude', tags: 'ui' },
     body: '`#card=<file name>` opens the card. The file name never changes, so the link is stable.',
-    steps: [[15.4, 'marcus', to('todo')], ...flow(15.6, 16.3, 16.6)],
+    steps: [[15.4, 'marcus', to('todo')], ...flow(15.6, 17.6, 17.8)],
   },
   {
     heading: 'Collapse comments by default', lane: BOARD, day: 16.4, who: 'marcus', status: 'todo',
     fields: { type: 'improvement', assignee: 'claude', tags: 'ui' },
     // Filed under cards at first; moved to the board lane once lanes existed.
-    steps: [...flow(16.7, 16.9, 17), [20.7, 'marcus', { lane: { from: FILES, to: BOARD } }]],
+    steps: [...flow(16.5, 17.85, 17.95), [20.7, 'marcus', { lane: { from: FILES, to: BOARD } }]],
   },
   {
     heading: 'Shared folders update live', lane: SHARING, day: 15, who: 'marcus', status: 'backlog',
     fields: { type: 'feature', assignee: 'claude', tags: 'sharing' },
     body: 'Drive for desktop fires no file events for remote changes. Poll every 3 seconds: names, sizes, mtimes, never contents.',
-    steps: [[16.8, 'marcus', to('todo')], ...flow(17.1, 17.8, 18)],
+    steps: [
+      [16.75, 'marcus', to('todo')], [16.8, 'claude', to('doing')],
+      // Third card in doing, limit two: the board turns red.
+      [16.85, 'marcus', say('Three cards in doing and the limit is two. Stop starting, start finishing: links and comments first.')],
+      [18, 'claude', to('review')], [18.15, 'marcus', to('done')],
+    ],
   },
   {
     heading: 'Use a drag & drop library', lane: BOARD, day: 1, who: 'claude', status: 'backlog',
@@ -153,7 +159,9 @@ const STORIES: Story[] = [
     heading: 'Swimlanes from subfolders', lane: BOARD, day: 6.5, who: 'marcus', status: 'backlog',
     fields: { type: 'feature', assignee: 'claude', tags: 'columns' },
     body: 'A folder is a lane, a row across the shared columns. No config: a folder next to a same-named card holds its attachments instead.',
-    steps: [[19.8, 'marcus', to('todo')], ...flow(19.9, 20.5, 20.65, [[20.6, 'claude', say('Lanes are made in Finder, not on the board. Dragging a card to another lane moves its file.')]])],
+    steps: [[19.8, 'marcus', to('todo')], ...flow(19.9, 20.1, 20.65, [
+      [20.15, 'marcus', say('Two cards waiting for review, the limit is one. Reviewing Replay before anything new.')],
+      [20.6, 'claude', say('Lanes are made in Finder, not on the board. Dragging a card to another lane moves its file.')]])],
   },
   {
     heading: 'Render markdown in cards', lane: FILES, day: 8.6, who: 'marcus', status: 'backlog',
@@ -165,7 +173,7 @@ const STORIES: Story[] = [
   {
     heading: 'A demo board that tells this story', lane: null, day: 20.7, who: 'marcus', status: 'todo',
     fields: { type: 'docs', assignee: 'claude', tags: 'replay' },
-    steps: [[20.8, 'claude', to('doing')], [20.9, 'claude', say('You are looking at it. Press ▶ Replay.')]],
+    steps: [[20.8, 'claude', to('doing')], [20.9, 'claude', say('You are looking at it. Press ▶ Replay, and watch doing and review turn red when they go over their WIP limits.')]],
   },
 ];
 
@@ -173,7 +181,7 @@ const STORIES: Story[] = [
 export function demoBoard(now: number): Map<string, string> {
   const start = now - SPAN * DAY;
   const at = (day: number) => new Date(start + day * DAY).toISOString().replace(/\.\d+Z$/, 'Z');
-  const files = new Map<string, string>([[CONFIG_FILE, 'columns: [backlog, todo, doing, review, done]\n']]);
+  const files = new Map<string, string>([[CONFIG_FILE, 'columns: [backlog, todo, doing, review, done]\nwip:\n  doing: 2\n  review: 1\n']]);
   for (const s of STORIES) {
     let text = newCard(s.heading, s.status, s.who, at(s.day));
     if (s.fields || s.body) text = applyChange(text, { fields: s.fields, body: s.body && `# ${s.heading}\n\n${s.body}` }, s.who, at(s.day));

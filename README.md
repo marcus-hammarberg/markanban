@@ -222,7 +222,7 @@ npm start -- ./some-board
 
 Changes go straight to `main`. The same `npm run check` runs on GitHub for every push.
 
-To see Replay in action, generate a demo board: the story of how Markanban itself was built, about 20 cards dated over the last three weeks and sorted into three [swimlanes](#swimlanes).
+To see Replay in action, generate a demo board: the story of how Markanban itself was built, about 20 cards dated over the last three weeks and sorted into three [swimlanes](#swimlanes). It has [WIP limits](#wip-limits) too: watch doing and review turn red when the story goes over them.
 
 ```sh
 npm run demo -- ./demo-board   # needs a new or empty folder

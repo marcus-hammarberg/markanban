@@ -288,7 +288,7 @@ A separate, read-only mode that plays back how cards moved across the board over
 
 **Demo board**
 
-- `npm run demo [folder]` (`src/demo.ts`, default `demo-board`) writes a board telling how Markanban was built: the real commit order, stretched over three weeks and dated back from today so the story ends just now. Cards sit in three lane folders (`1 Cards & files`, `2 Board`, `3 Sharing & release`) with the newest at the top level, and one card has a logged lane move. Cards are written with `newCard`/`applyChange`, exactly as the UI would. Refuses a folder that isn't new or empty; never overwrites. A dev script, not part of the CLI.
+- `npm run demo [folder]` (`src/demo.ts`, default `demo-board`) writes a board telling how Markanban was built: the real commit order, stretched over three weeks and dated back from today so the story ends just now. Cards sit in three lane folders (`1 Cards & files`, `2 Board`, `3 Sharing & release`) with the newest at the top level, and one card has a logged lane move. `.markanban.yml` sets WIP limits (doing 2, review 1); the story goes over each once, for long enough to see in Replay (about a day of board time, a few seconds of playback), with a comment saying why, and is within the limits at the end. Cards are written with `newCard`/`applyChange`, exactly as the UI would. Refuses a folder that isn't new or empty; never overwrites. A dev script, not part of the CLI.
 
 **Known gap (accepted)**
 
