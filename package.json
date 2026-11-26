@@ -29,8 +29,8 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
     "@types/node": "^26.6.6",
-    "fallow": "3.42.0",
-    "markdownlint": "0.42.1",
+    "fallow": "3.44.0",
+    "markdownlint": "0.42.2",
     "markdownlint-cli2": "0.24.1",
     "typescript": "^7.0.2"
   }
