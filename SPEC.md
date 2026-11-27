@@ -393,3 +393,25 @@ Sharing a board = putting the folder in a sync client's folder (Google Drive for
 - Editing unknown fields in the UI
 - WIP limits: setting a limit in the UI; per-lane limits
 - Blocker marker on a card (e.g. a `blocked` field holding the reason), shown prominently on the board
+
+## Browser build (tried and rejected, 2026-11)
+
+We spiked a version that runs without `npx`: a hosted page, an installable PWA and a single `markanban.html`, for Chrome and Edge, reading the board folder through the File System Access API. We also considered an Electron wrapper for the same goal. We dropped both. This note is here so nobody tries again without new reasons. The spike's code is in `git stash` as "browser-build spike (rejected, see SPEC.md)".
+
+What the spike had:
+
+- `src/core.ts`: the API taken out of `server.ts` (`createApi(storage).handle(request)`), so the same routes could answer a page's `fetch()`.
+- `src/layout.ts`: lane, attachment and card-name rules taken out of `storage.ts`, so Node and the browser shared them.
+- `web/`: a shell (folder picker, IndexedDB registry of folder handles, permission prompts, and a shim that answered `fetch('/api/…')` and stood in for `EventSource`), a browser storage over directory handles, and an esbuild build that produced a static site and one inline HTML file.
+- A board `id:` in `.markanban.yml`, created when a link was copied, so a link could find the same folder on another computer through the registry.
+- A scenario that ran the same API steps against Node storage and browser storage and compared the bytes. It passed, also from `file://`.
+
+Why we backed out:
+
+- **Not everything is a file any more.** The list of opened folders, and the permission to open them, lived in browser storage (IndexedDB handles) tied to one origin. Changing the URL would lose everyone's saved boards. Links needed a new `id:` written into the user's config. Markanban's only state should be the folder.
+- **Too much machinery for the gain.** A second storage implementation, a transport shim, a build step and bundler (esbuild), a hosting origin to choose and keep, a service worker, and CI to publish it all. The runtime is meant to be Node built-ins plus `yaml`.
+- **A weaker product in places.** Chrome and Edge only. No file events, so a 3 s poll. Moves aren't atomic without native `move()`. Chrome refuses some top-level folders. Permission prompts come back after a restart.
+- **A bigger trust boundary.** Whoever can change the hosted page can read and write every folder a person has granted it. With `npx`, the code runs locally from a package the person chose to run.
+- Electron avoids the browser limits, but it ships a whole browser runtime, needs signing and auto-update, and is heavier than everything above.
+
+`npx markanban` stays the only way to run Markanban. Two parts could come back on their own if they prove useful: a transport-free API module taken out of `server.ts` (if a second backend ever appears behind the storage seam), and board ids in links (if links between computers become a real need).
